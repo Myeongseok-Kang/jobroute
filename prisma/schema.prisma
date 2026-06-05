@@ -1,0 +1,29 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  source      String                          // 어디서 왔는지 (워크넷/사람인 등)
+  sourceUrl   String                          // 원본 공고 링크
+  title       String                          // 공고 제목
+  company     String                          // 회사명
+  location    String?                         // 근무지
+  salaryMin   Int?                            // 연봉 하한
+  salaryMax   Int?                            // 연봉 상한
+  contentHash String   @unique                // 중복 감지용 SHA256
+  rawText     String                          // JD 원문 (내부 전용, 외부 노출 X)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
