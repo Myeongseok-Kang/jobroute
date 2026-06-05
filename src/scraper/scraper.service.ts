@@ -31,7 +31,7 @@ export class ScraperService {
         this.logger.error(`원티드 ${res.status}: ${body}`);
         throw new Error(`원티드 응답 오류: ${res.status} (offset ${offset})`);
       }
-      
+
       const json = await res.json();
       const positions = json.data ?? [];
       if (positions.length === 0) break;
@@ -74,5 +74,95 @@ export class ScraperService {
 
     this.logger.log(`원티드 수집 완료 - 전체 ${total}건, 신규 ${saved}, 중복 ${skipped}`);
     return { total, saved, skipped };
+  }
+  
+  async scrapeWantedDetails(batchSize = 100) {
+    const targets = await this.prisma.job.findMany({
+      where: { source: 'wanted', detailFetched: false },
+      take: batchSize,
+    });
+
+    if (targets.length === 0) {
+      this.logger.log('상세 수집할 공고 없음 (전부 완료)');
+      return { processed: 0, failed: 0, remaining: 0 };
+    }
+
+    let processed = 0;
+    let failed = 0;
+
+    for (const job of targets) {
+      const wantedId = job.sourceUrl.split('/').pop();
+      const url = `https://www.wanted.co.kr/api/chaos/jobs/v4/${wantedId}/details?${Date.now()}=`;
+
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0',
+            'wanted-user-agent': 'user-web',
+            accept: 'application/json',
+          },
+        });
+
+        if (!res.ok) {
+          this.logger.warn(`공고 ${wantedId} 상세 실패: ${res.status}`);
+          failed++;
+          await this.sleep(1000);
+          continue;
+        }
+
+        const json = await res.json();
+        const detail = json.data?.job?.detail;
+
+        if (!detail) {
+          this.logger.warn(`공고 ${wantedId} detail 없음`);
+          failed++;
+          await this.sleep(1000);
+          continue;
+        }
+
+        const fullText = [
+          detail.intro,
+          detail.main_tasks,
+          detail.requirements,
+          detail.preferred_points,
+          detail.benefits,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+
+        await this.prisma.job.update({
+          where: { id: job.id },
+          data: {
+            mainTasks: detail.main_tasks ?? null,
+            requirements: detail.requirements ?? null,
+            preferredPoints: detail.preferred_points ?? null,
+            benefits: detail.benefits ?? null,
+            rawText: fullText,
+            detailFetched: true,
+          },
+        });
+
+        processed++;
+        if (processed % 20 === 0) {
+          this.logger.log(`진행 중... ${processed}건 완료`);
+        }
+      } catch (err) {
+        this.logger.warn(`공고 ${wantedId} 처리 오류: ${err.message}`);
+        failed++;
+      }
+
+      await this.sleep(1000);
+    }
+
+    const remaining = await this.prisma.job.count({
+      where: { source: 'wanted', detailFetched: false },
+    });
+
+    this.logger.log(`상세 수집 배치 완료 - 성공 ${processed}, 실패 ${failed}, 남은 공고 ${remaining}`);
+    return { processed, failed, remaining };
+  }
+
+  private sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
   }
 }

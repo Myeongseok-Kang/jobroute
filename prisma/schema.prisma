@@ -26,4 +26,9 @@ model Job {
   rawText     String                          // JD 원문 (내부 전용, 외부 노출 X)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  mainTasks       String?
+  requirements    String?
+  preferredPoints String?
+  benefits        String?
+  detailFetched   Boolean  @default(false)
 }
