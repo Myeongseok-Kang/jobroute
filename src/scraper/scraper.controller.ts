@@ -3,7 +3,7 @@ import { ScraperService } from './scraper.service';
 
 @Controller('scraper')
 export class ScraperController {
-  constructor(private readonly scraperService: ScraperService) {}
+  constructor(private readonly scraperService: ScraperService) { }
 
   @Post('run')
   run() {
@@ -21,6 +21,24 @@ export class ScraperController {
     let totalFailed = 0;
     while (true) {
       const result = await this.scraperService.scrapeWantedDetails(100);
+      totalProcessed += result.processed;
+      totalFailed += result.failed;
+      if (result.remaining === 0 || result.processed === 0) break;
+    }
+    return { totalProcessed, totalFailed };
+  }
+
+  @Post('saramin')
+  runSaramin() {
+    return this.scraperService.scrapeSaramin();
+  }
+
+  @Post('saramin/details')
+  async runSaraminDetails() {
+    let totalProcessed = 0;
+    let totalFailed = 0;
+    while (true) {
+      const result = await this.scraperService.scrapeSaraminDetails(100);
       totalProcessed += result.processed;
       totalFailed += result.failed;
       if (result.remaining === 0 || result.processed === 0) break;

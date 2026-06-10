@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { createHash } from 'crypto';
+import * as cheerio from 'cheerio';
 
 @Injectable()
 export class ScraperService {
@@ -159,6 +160,147 @@ export class ScraperService {
     });
 
     this.logger.log(`상세 수집 배치 완료 - 성공 ${processed}, 실패 ${failed}, 남은 공고 ${remaining}`);
+    return { processed, failed, remaining };
+  }
+
+  async scrapeSaramin(maxPage = 9999) {
+    let saved = 0;
+    let skipped = 0;
+    let total = 0;
+
+    for (let page = 1; page <= maxPage; page++) {
+      const url = `https://www.saramin.co.kr/zf_user/jobs/list/job-category?cat_mcls=2&page=${page}`;
+
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+
+      if (!res.ok) {
+        this.logger.warn(`사람인 ${page}페이지 실패: ${res.status}`);
+        break;
+      }
+
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const items = $('.box_item');
+
+      if (items.length === 0) break;
+
+      for (const el of items.toArray()) {
+        const title = $(el).find('.notification_info .job_tit .str_tit').text().trim();
+        const company = $(el).find('.company_nm .str_tit').first().text().trim();
+        const place = $(el).find('.work_place').text().trim();
+        const career = $(el).find('.career').text().trim();
+        const link = $(el).find('.job_tit .str_tit').attr('href');
+        const recIdx = link?.match(/rec_idx=(\d+)/)?.[1];
+
+        if (!recIdx || !title) continue;
+
+        total++;
+        const sourceUrl = `https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=${recIdx}`;
+        const rawText = `${title} / ${company} / ${career}`;
+        const hash = createHash('sha256').update(rawText).digest('hex');
+
+        const exists = await this.prisma.job.findUnique({
+          where: { contentHash: hash },
+        });
+        if (exists) {
+          skipped++;
+          continue;
+        }
+
+        await this.prisma.job.create({
+          data: {
+            source: 'saramin',
+            sourceUrl,
+            title,
+            company: company || '미상',
+            location: place || null,
+            contentHash: hash,
+            rawText,
+          },
+        });
+        saved++;
+      }
+
+      this.logger.log(`사람인 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
+      await this.sleep(1500);
+    }
+
+    this.logger.log(`사람인 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
+    return { total, saved, skipped };
+  }
+
+  async scrapeSaraminDetails(batchSize = 100) {
+    const targets = await this.prisma.job.findMany({
+      where: { source: 'saramin', detailFetched: false },
+      take: batchSize,
+    });
+
+    if (targets.length === 0) {
+      this.logger.log('사람인 상세 수집할 공고 없음 (전부 완료)');
+      return { processed: 0, failed: 0, remaining: 0 };
+    }
+
+    let processed = 0;
+    let failed = 0;
+
+    for (const job of targets) {
+      const recIdx = job.sourceUrl.match(/rec_idx=(\d+)/)?.[1];
+      if (!recIdx) {
+        failed++;
+        continue;
+      }
+
+      const url = `https://www.saramin.co.kr/zf_user/jobs/relay/view-detail?rec_idx=${recIdx}&rec_seq=0`;
+
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+
+        if (!res.ok) {
+          this.logger.warn(`사람인 ${recIdx} 상세 실패: ${res.status}`);
+          failed++;
+          await this.sleep(1500);
+          continue;
+        }
+
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        const content = $('.user_content').text().trim() || $('.wrap_jv_cont').text().trim();
+
+        await this.prisma.job.update({
+          where: { id: job.id },
+          data: {
+            rawText: content || job.rawText,
+            detailFetched: true,
+          },
+        });
+
+        processed++;
+        if (processed % 20 === 0) {
+          this.logger.log(`사람인 상세 진행 중... ${processed}건`);
+        }
+      } catch (err) {
+        this.logger.warn(`사람인 ${recIdx} 처리 오류: ${err.message}`);
+        failed++;
+      }
+
+      await this.sleep(1500);
+    }
+
+    const remaining = await this.prisma.job.count({
+      where: { source: 'saramin', detailFetched: false },
+    });
+
+    this.logger.log(`사람인 상세 배치 완료 - 성공 ${processed}, 실패 ${failed}, 남은 ${remaining}`);
     return { processed, failed, remaining };
   }
 
