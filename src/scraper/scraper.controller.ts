@@ -45,4 +45,22 @@ export class ScraperController {
     }
     return { totalProcessed, totalFailed };
   }
+
+  @Post('jobkorea')
+  runJobkorea() {
+    return this.scraperService.scrapeJobkorea();
+  }
+
+  @Post('jobkorea/details')
+  async runJobkoreaDetails() {
+    let totalProcessed = 0;
+    let totalFailed = 0;
+    while (true) {
+      const r = await this.scraperService.scrapeJobkoreaDetails(100);
+      totalProcessed += r.processed;
+      totalFailed += r.failed;
+      if (r.remaining === 0 || r.processed === 0) break;
+    }
+    return { totalProcessed, totalFailed };
+  }
 }

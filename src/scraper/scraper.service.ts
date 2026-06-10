@@ -304,6 +304,172 @@ export class ScraperService {
     return { processed, failed, remaining };
   }
 
+  async scrapeJobkorea(maxPage = 9999) {
+    const dutyCodes =
+      '1000229,1000230,1000231,1000232,1000233,1000234,1000235,1000236,1000237,1000238,1000239,1000240,1000241,1000242,1000243,1000244,1000245,1000246,1000247,1000417,1000418,1000419,1000420,1000421,1000422,1000423';
+
+    let saved = 0;
+    let skipped = 0;
+    let total = 0;
+
+    for (let page = 1; page <= maxPage; page++) {
+      const body = new URLSearchParams({
+        isDefault: 'false',
+        'condition[duty]': dutyCodes,
+        'condition[menucode]': '',
+        page: String(page),
+        direct: '0',
+        order: '20',
+        pagesize: '40',
+        tabindex: '0',
+        onePick: '0',
+        confirm: '0',
+        profile: '0',
+      });
+
+      const res = await fetch('https://www.jobkorea.co.kr/Recruit/Home/_GI_List/', {
+        method: 'POST',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+          Referer: 'https://www.jobkorea.co.kr/recruit/joblist?menucode=duty',
+        },
+        body: body.toString(),
+      });
+
+      if (!res.ok) {
+        this.logger.warn(`잡코리아 ${page}페이지 실패: ${res.status}`);
+        break;
+      }
+
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const links = $('a[href*="GI_Read"]');
+
+      const pageJobs = new Map<string, string>();
+      links.each((i, el) => {
+        const href = $(el).attr('href') || '';
+        const title = $(el).text().trim();
+        const id = href.match(/GI_Read\/(\d+)/)?.[1];
+        if (id && title && !pageJobs.has(id)) {
+          pageJobs.set(id, title);
+        }
+      });
+
+      if (pageJobs.size === 0) break;
+
+      for (const [id, title] of pageJobs) {
+        total++;
+        const sourceUrl = `https://www.jobkorea.co.kr/Recruit/GI_Read/${id}`;
+        const rawText = title;
+        const hash = createHash('sha256').update(`jobkorea-${id}`).digest('hex');
+
+        const exists = await this.prisma.job.findUnique({
+          where: { contentHash: hash },
+        });
+        if (exists) {
+          skipped++;
+          continue;
+        }
+
+        await this.prisma.job.create({
+          data: {
+            source: 'jobkorea',
+            sourceUrl,
+            title,
+            company: '미상',
+            location: null,
+            contentHash: hash,
+            rawText,
+          },
+        });
+        saved++;
+      }
+
+      this.logger.log(`잡코리아 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
+      await this.sleep(1500);
+    }
+
+    this.logger.log(`잡코리아 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
+    return { total, saved, skipped };
+  }
+
+  async scrapeJobkoreaDetails(batchSize = 100) {
+    const targets = await this.prisma.job.findMany({
+      where: { source: 'jobkorea', detailFetched: false },
+      take: batchSize,
+    });
+
+    if (targets.length === 0) {
+      this.logger.log('잡코리아 상세 수집할 공고 없음 (전부 완료)');
+      return { processed: 0, failed: 0, remaining: 0 };
+    }
+
+    let processed = 0;
+    let failed = 0;
+    const ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    for (const job of targets) {
+      const id = job.sourceUrl.match(/GI_Read\/(\d+)/)?.[1];
+      if (!id) {
+        failed++;
+        continue;
+      }
+
+      try {
+        const res1 = await fetch(`https://www.jobkorea.co.kr/Recruit/GI_Read/${id}`, {
+          headers: { 'User-Agent': ua },
+        });
+        let company = job.company;
+        if (res1.ok) {
+          const $1 = cheerio.load(await res1.text());
+          const c = $1('h2').first().text().trim();
+          if (c) company = c;
+        }
+
+        const res2 = await fetch(`https://www.jobkorea.co.kr/Recruit/GI_Read_Comt_Ifrm?Gno=${id}&isHiringCenter=false&hideMapView=false`, {
+          headers: { 'User-Agent': ua },
+        });
+
+        let body = '';
+        if (res2.ok) {
+          const $2 = cheerio.load(await res2.text());
+          $2('script, style, noscript').remove();
+          body = $2('body').text().replace(/\s+/g, ' ').trim();
+        }
+
+        await this.prisma.job.update({
+          where: { id: job.id },
+          data: {
+            company,
+            rawText: body.length > 100 ? body : job.rawText,
+            detailFetched: true,
+          },
+        });
+
+        processed++;
+        if (processed % 20 === 0) {
+          this.logger.log(`잡코리아 상세 진행 중... ${processed}건`);
+        }
+      } catch (err) {
+        this.logger.warn(`잡코리아 ${id} 오류: ${err.message}`);
+        failed++;
+      }
+
+      await this.sleep(1200);
+    }
+
+    const remaining = await this.prisma.job.count({
+      where: { source: 'jobkorea', detailFetched: false },
+    });
+
+    this.logger.log(`잡코리아 상세 배치 완료 - 성공 ${processed}, 실패 ${failed}, 남은 ${remaining}`);
+    return { processed, failed, remaining };
+  }
+
   private sleep(ms: number) {
     return new Promise((r) => setTimeout(r, ms));
   }
