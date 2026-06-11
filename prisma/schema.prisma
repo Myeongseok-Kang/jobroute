@@ -30,5 +30,7 @@ model Job {
   requirements    String?
   preferredPoints String?
   benefits        String?
-  detailFetched   Boolean  @default(false)
+  detailFetched   Boolean  @default(false) 
+  hasBody    Boolean  @default(false)         // 본문이 충실한지 (이미지형 구분)
+  isActive   Boolean  @default(true)          // 살아있는 공고인지 (마감/죽은 공고 거르기용)
 }

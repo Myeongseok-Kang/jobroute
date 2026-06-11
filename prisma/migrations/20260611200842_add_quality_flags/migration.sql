@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Job" ADD COLUMN     "hasBody" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true;
