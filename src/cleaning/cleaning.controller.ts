@@ -9,4 +9,9 @@ export class CleaningController {
     flagBody() {
         return this.cleaningService.flagBodyQuality();
     }
+
+    @Post('standardize-location')
+    standardizeLocation() {
+        return this.cleaningService.standardizeLocation();
+    }
 }

@@ -24,6 +24,7 @@ model Job {
   salaryMax   Int?                            // 연봉 상한
   contentHash String   @unique                // 중복 감지용 SHA256
   rawText     String                          // JD 원문 (내부 전용, 외부 노출 X)
+  region      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   mainTasks       String?
