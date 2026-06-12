@@ -346,21 +346,41 @@ export class ScraperService {
 
       const html = await res.text();
       const $ = cheerio.load(html);
-      const links = $('a[href*="GI_Read"]');
+      const rows = $('tr.devloopArea');
 
-      const pageJobs = new Map<string, string>();
-      links.each((i, el) => {
-        const href = $(el).attr('href') || '';
-        const title = $(el).text().trim();
+      if (rows.length === 0) break;
+
+      const regionPattern =
+        /(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s?([가-힣]+(시|군|구))/;
+
+      for (const el of rows.toArray()) {
+        const titleEl = $(el).find('td.tplTit .titBx strong a[href*="GI_Read"]');
+        const title = titleEl.text().trim();
+        const href = titleEl.attr('href') || '';
         const id = href.match(/GI_Read\/(\d+)/)?.[1];
-        if (id && title && !pageJobs.has(id)) {
-          pageJobs.set(id, title);
-        }
-      });
+        if (!id || !title) continue;
 
-      if (pageJobs.size === 0) break;
+        const company = $(el).find('td.tplCo a').first().text().trim();
 
-      for (const [id, title] of pageJobs) {
+        let location: string | null = null;
+        let region: string | null = null;
+        $(el).find('td.tplTit p.etc .cell').each((i, cell) => {
+          if (location) return;
+          const t = $(cell).text().trim();
+
+          const m = t.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s?([가-힣]+(시|군|구))/);
+          if (m) { region = m[1]; location = `${m[1]} ${m[2]}`; return; }
+
+          const m2 = t.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s?전지역/);
+          if (m2) { region = m2[1]; location = `${m2[1]} 전지역`; return; }
+
+          if (/전국/.test(t)) { region = '전국'; location = '전국'; return; }
+
+          if (/일본|중국|미국|베트남|싱가포르|인도|유럽|해외|아시아/.test(t)) {
+            region = t.split(/\s+/)[0]; location = t; return;
+          }
+        });
+
         total++;
         const sourceUrl = `https://www.jobkorea.co.kr/Recruit/GI_Read/${id}`;
         const rawText = title;
@@ -369,7 +389,16 @@ export class ScraperService {
         const exists = await this.prisma.job.findUnique({
           where: { contentHash: hash },
         });
+
         if (exists) {
+          await this.prisma.job.update({
+            where: { id: exists.id },
+            data: {
+              company: company || exists.company,
+              location: location ?? exists.location,
+              region: region ?? exists.region,
+            },
+          });
           skipped++;
           continue;
         }
@@ -379,8 +408,9 @@ export class ScraperService {
             source: 'jobkorea',
             sourceUrl,
             title,
-            company: '미상',
-            location: null,
+            company: company || '미상',
+            location,
+            region,
             contentHash: hash,
             rawText,
           },
