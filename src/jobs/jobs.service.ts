@@ -5,25 +5,57 @@ import { PrismaService } from '../prisma.service';
 export class JobsService {
   constructor(private prisma: PrismaService) {}
 
-  // 공고 전체 목록 가져오기
-  findAll() {
-    return this.prisma.job.findMany();
-  }
+  async search(params: {
+    q?: string;
+    region?: string;
+    source?: string;
+    page?: number;
+    size?: number;
+  }) {
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const size = params.size && params.size > 0 ? Math.min(params.size, 50) : 20;
 
-  // 테스트용 공고
-  createTest() {
-    return this.prisma.job.create({
-      data: {
-        source: '테스트',
-        sourceUrl: 'https://example.com/job/1',
-        title: '백엔드 신입 개발자',
-        company: '잡루트',
-        location: '서울',
-        salaryMin: 3000,
-        salaryMax: 4000,
-        contentHash: 'test-hash-' + Date.now(),
-        rawText: '공고 원문 내용입니다.',
-      },
-    });
+    const where: any = {
+      duplicateOf: null,
+    };
+
+    if (params.q) {
+      where.OR = [
+        { title: { contains: params.q, mode: 'insensitive' } },
+        { company: { contains: params.q, mode: 'insensitive' } },
+        { rawText: { contains: params.q, mode: 'insensitive' } },
+      ];
+    }
+    if (params.region) where.region = params.region;
+    if (params.source) where.source = params.source;
+
+    const [total, items] = await Promise.all([
+      this.prisma.job.count({ where }),
+      this.prisma.job.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * size,
+        take: size,
+        select: {
+          id: true,
+          source: true,
+          sourceUrl: true,
+          title: true,
+          company: true,
+          location: true,
+          region: true,
+          hasBody: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      size,
+      totalPages: Math.ceil(total / size),
+      items,
+    };
   }
 }
