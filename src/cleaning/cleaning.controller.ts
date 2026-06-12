@@ -14,4 +14,9 @@ export class CleaningController {
     standardizeLocation() {
         return this.cleaningService.standardizeLocation();
     }
+
+    @Post('deduplicate')
+    deduplicate() {
+        return this.cleaningService.deduplicate();
+    }
 }
