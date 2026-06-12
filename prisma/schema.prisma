@@ -24,11 +24,15 @@ model Job {
   salaryMax   Int?                            // 연봉 상한
   contentHash String   @unique                // 중복 감지용 SHA256
   rawText     String                          // JD 원문 (내부 전용, 외부 노출 X)
+  region      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   mainTasks       String?
   requirements    String?
   preferredPoints String?
   benefits        String?
-  detailFetched   Boolean  @default(false)
+  duplicateOf     String?
+  detailFetched   Boolean  @default(false) 
+  hasBody    Boolean  @default(false)         // 본문이 충실한지 (이미지형 구분)
+  isActive   Boolean  @default(true)          // 살아있는 공고인지 (마감/죽은 공고 거르기용)
 }
