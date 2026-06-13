@@ -9,4 +9,9 @@ export class EmbeddingController {
     sample() {
         return this.embeddingService.embedSample();
     }
+
+    @Post('all')
+    all() {
+        return this.embeddingService.embedAll();
+    }
 }
