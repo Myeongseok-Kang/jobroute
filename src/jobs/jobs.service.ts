@@ -17,6 +17,7 @@ export class JobsService {
 
     const where: any = {
       duplicateOf: null,
+      isIT: true,
     };
 
     if (params.q) {

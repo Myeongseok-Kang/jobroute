@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Job" ADD COLUMN     "isIT" BOOLEAN NOT NULL DEFAULT true;
