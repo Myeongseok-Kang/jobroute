@@ -6,6 +6,7 @@ import { PrismaService } from './prisma.service';
 import { JobsModule } from './jobs/jobs.module';
 import { ScraperModule } from './scraper/scraper.module';
 import { CleaningModule } from './cleaning/cleaning.module';
+import { EmbeddingModule } from './embedding/embedding.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CleaningModule } from './cleaning/cleaning.module';
     JobsModule,
     ScraperModule,
     CleaningModule,
+    EmbeddingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
