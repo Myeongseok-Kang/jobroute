@@ -118,4 +118,40 @@ export class EmbeddingService {
         this.logger.log(`완료 - 임베딩 ${processed}건, 스킵 ${skipped}건, ${sec}초`);
         return { total: jobs.length, embedded: processed, skipped, seconds: sec };
     }
+
+    async search(query: string, limit = 20) {
+        const [vec] = await this.embedQuery(query);
+        const vecStr = `[${vec.join(',')}]`;
+
+        return this.prisma.$queryRaw`
+      SELECT id, title, company, location, region, source,
+             1 - (embedding <=> ${vecStr}::vector) AS score
+      FROM "Job"
+      WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${vecStr}::vector
+      LIMIT ${limit}
+    `;
+    }
+
+    private async embedQuery(text: string, retries = 5): Promise<number[][]> {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                const res = await this.voyage.embed({
+                    model: 'voyage-4-large',
+                    input: [text],
+                    inputType: 'query',
+                    outputDimension: 1024,
+                });
+                return res.data!.map((d) => d.embedding!);
+            } catch (e: any) {
+                const status = e?.statusCode ?? e?.status;
+                if (status === 429 && attempt < retries) {
+                    await new Promise((r) => setTimeout(r, 2 ** attempt * 1000));
+                    continue;
+                }
+                throw e;
+            }
+        }
+        throw new Error('재시도 초과');
+    }
 }

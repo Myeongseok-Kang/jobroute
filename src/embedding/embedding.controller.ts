@@ -1,4 +1,4 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Post, Get, Query } from '@nestjs/common';
 import { EmbeddingService } from './embedding.service';
 
 @Controller('embedding')
@@ -13,5 +13,10 @@ export class EmbeddingController {
     @Post('all')
     all() {
         return this.embeddingService.embedAll();
+    }
+
+    @Get('search')
+    search(@Query('q') q: string) {
+        return this.embeddingService.search(q);
     }
 }
