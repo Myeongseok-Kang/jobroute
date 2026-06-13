@@ -127,7 +127,7 @@ export class EmbeddingService {
       SELECT id, title, company, location, region, source,
              1 - (embedding <=> ${vecStr}::vector) AS score
       FROM "Job"
-      WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL
+      WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL AND "isIT" = true
       ORDER BY embedding <=> ${vecStr}::vector
       LIMIT ${limit}
     `;
@@ -153,5 +153,67 @@ export class EmbeddingService {
             }
         }
         throw new Error('재시도 초과');
+    }
+
+    private readonly IT_REFERENCE =
+        '소프트웨어 개발자. 백엔드 프론트엔드 웹 모바일 앱 개발. 프로그래밍, API 서버, 데이터베이스, 클라우드 인프라, AI 머신러닝, 데이터 엔지니어링, DevOps, 보안. 코드 작성과 시스템 설계를 하는 IT 엔지니어.';
+
+    
+    async flagNonIT(threshold = 0.1) {
+        const [refVec] = await this.embedQuery(this.IT_REFERENCE);
+        const refStr = `[${refVec.join(',')}]`;
+
+        const dist = await this.prisma.$queryRaw<{ bucket: number; cnt: bigint }[]>`
+      SELECT FLOOR((1 - (embedding <=> ${refStr}::vector)) * 20) / 20 AS bucket,
+             COUNT(*) AS cnt
+      FROM "Job"
+      WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL
+      GROUP BY bucket ORDER BY bucket
+    `;
+        this.logger.log(`분포: ${JSON.stringify(dist.map(d => ({ b: d.bucket, c: Number(d.cnt) })))}`);
+
+        const affected = await this.prisma.$executeRaw`
+      UPDATE "Job"
+      SET "isIT" = (1 - (embedding <=> ${refStr}::vector)) >= ${threshold}
+      WHERE embedding IS NOT NULL
+    `;
+
+        const nonItCount = await this.prisma.job.count({ where: { isIT: false, duplicateOf: null } });
+        this.logger.log(`비IT ${nonItCount}건 (threshold ${threshold})`);
+        return { nonIT: nonItCount, threshold };
+    }
+
+    // 디버깅용
+    async debugSimilarity(opts: { min?: number; max?: number; dist?: boolean } = {}) {
+        const [refVec] = await this.embedQuery(this.IT_REFERENCE);
+        const refStr = `[${refVec.join(',')}]`;
+
+        if (opts.dist) {
+            const dist = await this.prisma.$queryRaw<{ bucket: number; cnt: bigint }[]>`
+        SELECT FLOOR((1 - (embedding <=> ${refStr}::vector)) * 20) / 20 AS bucket, COUNT(*) AS cnt
+        FROM "Job" WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL
+        GROUP BY bucket ORDER BY bucket
+      `;
+            return dist.map((d) => {
+                const lo = Number(d.bucket);
+                const hi = lo + 0.05;
+                return {
+                    구간: `${lo.toFixed(2)}~${hi.toFixed(2)}`,
+                    공고수: Number(d.cnt),
+                };
+            });
+        }
+
+        const min = opts.min ?? 0;
+        const max = opts.max ?? 1;
+        return this.prisma.$queryRaw`
+      SELECT title, company, source,
+             ROUND((1 - (embedding <=> ${refStr}::vector))::numeric, 4) AS score
+      FROM "Job"
+      WHERE "duplicateOf" IS NULL AND embedding IS NOT NULL
+        AND (1 - (embedding <=> ${refStr}::vector)) >= ${min}
+        AND (1 - (embedding <=> ${refStr}::vector)) < ${max}
+      ORDER BY score ASC
+    `;
     }
 }
