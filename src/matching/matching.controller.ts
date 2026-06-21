@@ -9,4 +9,16 @@ export class MatchingController {
     match(@Body() body: { text: string; region?: string; limit?: number }) {
         return this.matchingService.match(body);
     }
+
+    @Post('conditions')
+    matchByConditions(@Body() body: {
+        jobCategory?: string;
+        skills?: string[];
+        career?: string;
+        region?: string;
+        limit?: number;
+    }) {
+        return this.matchingService.matchByConditions(body);
+    }
 }
+

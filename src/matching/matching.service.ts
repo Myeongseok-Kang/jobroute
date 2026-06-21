@@ -71,6 +71,28 @@ export class MatchingService {
         };
     }
 
+    async matchByConditions(params: {
+        jobCategory?: string;      // 직무
+        skills?: string[];         // 기술 스택
+        career?: string;           // 경력
+        region?: string;
+        limit?: number;
+    }) {
+        // 조건 -> 자연어 문장
+        const parts: string[] = [];
+        if (params.jobCategory) parts.push(`${params.jobCategory} 개발자`);
+        if (params.skills?.length) parts.push(`${params.skills.join(', ')} 사용`);
+        if (params.career) parts.push(`경력 ${params.career}`);
+
+        const text = parts.join('. ');
+
+        return this.match({
+            text,
+            region: params.region,
+            limit: params.limit,
+        });
+    }
+
     private async generateReason(resume: string, job: any) {
         const jobText = [
             `제목: ${job.title}`,
