@@ -37,18 +37,38 @@ export class MatchingService {
       LIMIT ${limit}
     `;
 
-        const matches = rows as any[];
+        const rawRows = rows as any[];
 
         // 상위 10개 근거 생성
-        const topN = matches.slice(0, 10);
+        const TOP = 10;
+        const topRows = rawRows.slice(0, TOP);
         const reasons = await Promise.all(
-            topN.map((job) => this.generateReason(params.text, job)),
+            topRows.map((job) => this.generateReason(params.text, job)),
         );
-        topN.forEach((job, i) => {
-            job.reason = reasons[i];
+
+        const slim = (job: any) => ({
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            region: job.region,
+            source: job.source,
+            sourceUrl: job.sourceUrl,
+            score: job.score,
         });
 
-        return { count: matches.length, matches };
+        const recommended = topRows.map((job, i) => ({
+            ...slim(job),
+            reason: reasons[i],
+        }));
+
+        const moreCandidates = rawRows.slice(TOP).map(slim);
+
+        return {
+            total: rawRows.length,
+            recommended,
+            moreCandidates,
+        };
     }
 
     private async generateReason(resume: string, job: any) {
