@@ -6,5 +6,6 @@ import { PrismaService } from '../prisma.service';
 @Module({
     controllers: [EmbeddingController],
     providers: [EmbeddingService, PrismaService],
+    exports: [EmbeddingService],
 })
 export class EmbeddingModule { }

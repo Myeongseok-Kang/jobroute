@@ -133,7 +133,7 @@ export class EmbeddingService {
     `;
     }
 
-    private async embedQuery(text: string, retries = 5): Promise<number[][]> {
+    async embedQuery(text: string, retries = 5): Promise<number[][]> {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const res = await this.voyage.embed({
