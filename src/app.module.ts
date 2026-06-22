@@ -10,6 +10,7 @@ import { EmbeddingModule } from './embedding/embedding.module';
 import { MatchingModule } from './matching/matching.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { ResumeModule } from './resume/resume.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
     MatchingModule,
     AuthModule,
     UsersModule,
+    ResumeModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

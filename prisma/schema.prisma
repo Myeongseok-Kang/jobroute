@@ -49,6 +49,17 @@ model User {
   providerId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  resumes   Resume[]
 
   @@unique([provider, providerId])
+}
+
+model Resume {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
