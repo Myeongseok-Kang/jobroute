@@ -39,3 +39,16 @@ model Job {
   isIT       Boolean  @default(true)
   embedding  Unsupported("vector(1024)")?
 }
+
+model User {
+  id         String   @id @default(uuid())
+  email      String?  @unique
+  password   String?
+  name       String?
+  provider   String   @default("local")
+  providerId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([provider, providerId])
+}

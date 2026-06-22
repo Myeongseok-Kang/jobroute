@@ -8,6 +8,8 @@ import { ScraperModule } from './scraper/scraper.module';
 import { CleaningModule } from './cleaning/cleaning.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { MatchingModule } from './matching/matching.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { MatchingModule } from './matching/matching.module';
     CleaningModule,
     EmbeddingModule,
     MatchingModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
