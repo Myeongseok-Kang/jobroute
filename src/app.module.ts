@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ResumeModule } from './resume/resume.module';
 import { BookmarkModule } from './bookmark/bookmark.module';
+import { MatchHistoryModule } from './match-history/match-history.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { BookmarkModule } from './bookmark/bookmark.module';
     UsersModule,
     ResumeModule,
     BookmarkModule,
+    MatchHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

@@ -52,6 +52,7 @@ model User {
   updatedAt  DateTime @updatedAt
   resumes   Resume[]
   bookmarks Bookmark[]
+  matchHistories MatchHistory[]
 
   @@unique([provider, providerId])
 }
@@ -75,4 +76,14 @@ model Bookmark {
   createdAt DateTime @default(now())
 
   @@unique([userId, jobId])
+}
+
+model MatchHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inputType String
+  inputText String
+  result    Json
+  createdAt DateTime @default(now())
 }

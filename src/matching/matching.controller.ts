@@ -3,12 +3,14 @@ import { MatchingService } from './matching.service';
 import { UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
+import { MatchHistoryService } from '../match-history/match-history.service';
 
 @Controller('matching')
 export class MatchingController {
     constructor(
         private matchingService: MatchingService,
         private resumeService: ResumeService,
+        private matchHistory: MatchHistoryService,
     ) { }
 
     @Post()
@@ -35,11 +37,19 @@ export class MatchingController {
         @Body() body: { region?: string; limit?: number },
     ) {
         const resume = await this.resumeService.findOne(req.user.id, id);
-        return this.matchingService.match({
+        const result = await this.matchingService.match({
             text: resume.content,
             region: body.region,
             limit: body.limit,
         });
+
+        await this.matchHistory.create(req.user.id, {
+            inputType: 'resume',
+            inputText: resume.content,
+            result: result as any,
+        });
+
+        return result;
     }
 }
 
