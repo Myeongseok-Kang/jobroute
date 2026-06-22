@@ -20,4 +20,32 @@ export class UsersService {
             select: { id: true, email: true, name: true, createdAt: true },
         });
     }
+
+    async findOrCreateSocial(params: {
+        provider: string;
+        providerId: string;
+        email?: string;
+        name?: string;
+    }) {
+        // 같은 소셜 계정으로 이미 가입했는가
+        const existing = await this.prisma.user.findUnique({
+            where: {
+                provider_providerId: {
+                    provider: params.provider,
+                    providerId: params.providerId,
+                },
+            },
+        });
+        if (existing) return existing;
+
+        // 가입하지 않았다면
+        return this.prisma.user.create({
+            data: {
+                provider: params.provider,
+                providerId: params.providerId,
+                email: params.email,
+                name: params.name,
+            },
+        });
+    }
 }
