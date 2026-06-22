@@ -38,6 +38,7 @@ model Job {
   isActive   Boolean  @default(true)          // 살아있는 공고인지 (마감/죽은 공고 거르기용)
   isIT       Boolean  @default(true)
   embedding  Unsupported("vector(1024)")?
+  bookmarks Bookmark[]
 }
 
 model User {
@@ -50,6 +51,7 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   resumes   Resume[]
+  bookmarks Bookmark[]
 
   @@unique([provider, providerId])
 }
@@ -62,4 +64,15 @@ model Resume {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
 }
