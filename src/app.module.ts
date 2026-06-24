@@ -14,10 +14,18 @@ import { RedisModule } from './redis/redis.module';
 import { ResumeModule } from './resume/resume.module';
 import { BookmarkModule } from './bookmark/bookmark.module';
 import { MatchHistoryModule } from './match-history/match-history.module';
+import { QueueModule } from './queue/queue.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST ?? 'localhost',
+        port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
+      },
+    }),
     RedisModule,
     JobsModule,
     ScraperModule,
@@ -29,6 +37,7 @@ import { MatchHistoryModule } from './match-history/match-history.module';
     ResumeModule,
     BookmarkModule,
     MatchHistoryModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
