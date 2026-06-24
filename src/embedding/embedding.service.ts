@@ -3,13 +3,17 @@ import { PrismaService } from '../prisma.service';
 import { VoyageAIClient } from 'voyageai';
 import { buildEmbeddingText } from './build-embedding-text';
 import { createHash } from 'crypto';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class EmbeddingService {
     private readonly logger = new Logger(EmbeddingService.name);
     private readonly voyage = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private redis: RedisService,
+    ) { }
 
     private async embedDocuments(texts: string[], retries = 5): Promise<number[][]> {
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -134,6 +138,12 @@ export class EmbeddingService {
     }
 
     async embedQuery(text: string, retries = 5): Promise<number[][]> {
+        const key = `embed:${this.hashText(text)}`;
+        const cached = await this.redis.get<number[]>(key);
+        if (cached) {
+            return [cached];
+        }
+
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const res = await this.voyage.embed({
@@ -142,7 +152,9 @@ export class EmbeddingService {
                     inputType: 'query',
                     outputDimension: 1024,
                 });
-                return res.data!.map((d) => d.embedding!);
+                const vec = res.data!.map((d) => d.embedding!);
+                await this.redis.set(key, vec[0], 60 * 60 * 24 * 7); // 7일
+                return vec;
             } catch (e: any) {
                 const status = e?.statusCode ?? e?.status;
                 if (status === 429 && attempt < retries) {
