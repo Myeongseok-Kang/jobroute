@@ -34,4 +34,11 @@ export class ResumeService {
         await this.findOne(userId, id);
         return this.prisma.resume.delete({ where: { id } });
     }
+
+    findLatest(userId: string) {
+        return this.prisma.resume.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
 }
