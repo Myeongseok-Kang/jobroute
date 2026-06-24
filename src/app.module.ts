@@ -11,10 +11,14 @@ import { MatchingModule } from './matching/matching.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RedisModule } from './redis/redis.module';
+import { ResumeModule } from './resume/resume.module';
+import { BookmarkModule } from './bookmark/bookmark.module';
+import { MatchHistoryModule } from './match-history/match-history.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
     JobsModule,
     ScraperModule,
     CleaningModule,
@@ -22,8 +26,11 @@ import { RedisModule } from './redis/redis.module';
     MatchingModule,
     AuthModule,
     UsersModule,
+    ResumeModule,
+    BookmarkModule,
+    MatchHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })
-export class AppModule {}
+export class AppModule { }
