@@ -193,4 +193,69 @@ export class CleaningService {
         }
         return false;
     }
+
+    async extractCareerEmployment() {
+        const jobs = await this.prisma.job.findMany({
+            where: { duplicateOf: null, isIT: true },
+            select: { id: true, rawText: true },
+        });
+
+        this.logger.log(`경력/고용형태 추출 시작 - 대상 ${jobs.length}건`);
+
+        let careerFilled = 0;
+        let empFilled = 0;
+        let updated = 0;
+
+        for (const job of jobs) {
+            const careerMin = this.parseCareer(job.rawText);
+            const employmentType = this.parseEmployment(job.rawText);
+
+            if (careerMin === null && employmentType === null) continue;
+
+            await this.prisma.job.update({
+                where: { id: job.id },
+                data: { careerMin, employmentType },
+            });
+
+            if (careerMin !== null) careerFilled++;
+            if (employmentType !== null) empFilled++;
+            updated++;
+            if (updated % 500 === 0) this.logger.log(`추출 중... ${updated}건`);
+        }
+
+        this.logger.log(`추출 완료 - 경력 ${careerFilled}건, 고용형태 ${empFilled}건`);
+        return { total: jobs.length, careerFilled, empFilled };
+    }
+
+    private parseCareer(text: string): number | null {
+        if (!text) return null;
+        const t = text.replace(/\s/g, '');
+
+        // 신입/경력무관 -> 0
+        if (/신입/.test(t) && !/경력/.test(t)) return 0;
+        if (/경력무관|경력·신입|신입·경력|경력\/신입|신입\/경력/.test(t)) return 0;
+
+        // 경력N년이상 or 경력N년이상~M년이하 -> N
+        const m = t.match(/경력[^0-9]{0,4}([0-9]{1,2})년/);
+        if (m) return parseInt(m[1], 10);
+
+        // 경력 키워드만 있고 숫자 없음 -> 1
+        if (/경력/.test(t)) return 1;
+
+        // 신입 -> 0
+        if (/신입/.test(t)) return 0;
+
+        return null;
+    }
+
+    private parseEmployment(text: string): string | null {
+        if (!text) return null;
+        const t = text.replace(/\s/g, '');
+
+        if (/정규직/.test(t)) return '정규직';
+        if (/계약직/.test(t)) return '계약직';
+        if (/인턴/.test(t)) return '인턴';
+
+        return null;
+    }
 }
