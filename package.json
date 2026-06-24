@@ -33,6 +33,7 @@
     "bcrypt": "^6.0.0",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
+    "ioredis": "^5.11.1",
     "minhash": "^0.0.9",
     "openai": "^6.44.0",
     "passport": "^0.7.0",

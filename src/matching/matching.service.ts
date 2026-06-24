@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import OpenAI from 'openai';
+import { RedisService } from '../redis/redis.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class MatchingService {
@@ -10,6 +12,7 @@ export class MatchingService {
     constructor(
         private prisma: PrismaService,
         private embedding: EmbeddingService,
+        private redis: RedisService,
     ) { }
 
     async match(params: {
@@ -94,6 +97,12 @@ export class MatchingService {
     }
 
     private async generateReason(resume: string, job: any) {
+        const key = `reason:${createHash('sha256').update(resume).digest('hex')}:${job.id}`;
+        const cached = await this.redis.get<any>(key);
+        if (cached) {
+            return cached;
+        }
+
         const jobText = [
             `제목: ${job.title}`,
             `회사: ${job.company}`,
@@ -152,10 +161,14 @@ export class MatchingService {
             ],
         });
 
+        let parsed: any;
         try {
-            return JSON.parse(res.choices[0].message.content ?? '{}');
+            parsed = JSON.parse(res.choices[0].message.content ?? '{}');
         } catch {
             return { summary: '', matches: [], confirm: [] };
         }
+
+        await this.redis.set(key, parsed, 60 * 60 * 24);
+        return parsed;
     }
 }
