@@ -22,10 +22,12 @@ export class CollectProcessor extends WorkerHost {
         // 목록
         await this.scraper.scrapeSaramin();
         await this.scraper.scrapeJobkorea();
+        await this.scraper.scrapeWanted();
 
         // 상세
         await this.runDetails('saramin');
         await this.runDetails('jobkorea');
+        await this.scraper.scrapeWanted();
 
         this.logger.log('수집 완료 - 임베딩 큐에 작업 투입');
 
@@ -34,12 +36,16 @@ export class CollectProcessor extends WorkerHost {
         return { done: true };
     }
 
-    private async runDetails(site: 'saramin' | 'jobkorea') {
+    private async runDetails(site: 'wanted' | 'saramin' | 'jobkorea') {
         while (true) {
-            const r =
-                site === 'saramin'
-                    ? await this.scraper.scrapeSaraminDetails(100)
-                    : await this.scraper.scrapeJobkoreaDetails(100);
+            let r: { processed: number; remaining: number; failed: number };
+            if (site === 'wanted') {
+                r = await this.scraper.scrapeWantedDetails(100);
+            } else if (site === 'saramin') {
+                r = await this.scraper.scrapeSaraminDetails(100);
+            } else {
+                r = await this.scraper.scrapeJobkoreaDetails(100);
+            }
             if (r.remaining === 0 || r.processed === 0) break;
         }
     }
