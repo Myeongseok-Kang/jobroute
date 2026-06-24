@@ -21,12 +21,14 @@ export class MatchingService {
         userCareer?: number;        // (사용자) 경력 연차
         employmentType?: string;    // (사용자) 희망 고용형태
         limit?: number;
+        since?: Date;
     }) {
         const limit = params.limit ?? 20;
 
         const [vec] = await this.embedding.embedQuery(params.text);
         const vecStr = `[${vec.join(',')}]`;
 
+        const since = params.since ?? null;
         const region = params.region ?? null;
         const query = params.text;
         const userCareer = params.userCareer ?? null;
@@ -69,6 +71,7 @@ export class MatchingService {
         AND embedding IS NOT NULL
         AND "isIT" = true
         AND (${region}::text IS NULL OR region = ${region})
+        AND (${since}::timestamp IS NULL OR "createdAt" > ${since})
       ORDER BY score DESC
       LIMIT ${limit}
     `;

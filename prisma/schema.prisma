@@ -57,6 +57,7 @@ model User {
   resumes   Resume[]
   bookmarks Bookmark[]
   matchHistories MatchHistory[]
+  alertSetting AlertSetting?
 
   @@unique([provider, providerId])
 }
@@ -90,4 +91,15 @@ model MatchHistory {
   inputText String
   result    Json
   createdAt DateTime @default(now())
+}
+
+model AlertSetting {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled    Boolean   @default(false)
+  resumeId   String?
+  lastSentAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
