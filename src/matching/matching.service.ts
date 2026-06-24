@@ -25,24 +25,32 @@ export class MatchingService {
         const [vec] = await this.embedding.embedQuery(params.text);
         const vecStr = `[${vec.join(',')}]`;
 
-        // isIT 필터 + 지역 필터 + 유사도 상위 N개
         const region = params.region ?? null;
+        const query = params.text;
+
+        // 임베딩 유사도(0.7) + trigram 유사도(0.3)
         const rows = await this.prisma.$queryRaw`
       SELECT id, title, company, location, region, source, "sourceUrl",
              "mainTasks", "requirements", "preferredPoints",
-             1 - (embedding <=> ${vecStr}::vector) AS score
+             1 - (embedding <=> ${vecStr}::vector) AS embed_score,
+             GREATEST(
+               similarity(title, ${query}),
+               similarity(company, ${query})
+             ) AS trgm_score,
+             (0.7 * (1 - (embedding <=> ${vecStr}::vector))
+              + 0.3 * GREATEST(similarity(title, ${query}), similarity(company, ${query}))
+             ) AS score
       FROM "Job"
       WHERE "duplicateOf" IS NULL
         AND embedding IS NOT NULL
         AND "isIT" = true
         AND (${region}::text IS NULL OR region = ${region})
-      ORDER BY embedding <=> ${vecStr}::vector
+      ORDER BY score DESC
       LIMIT ${limit}
     `;
 
         const rawRows = rows as any[];
 
-        // 상위 10개 근거 생성
         const TOP = 10;
         const topRows = rawRows.slice(0, TOP);
         const reasons = await Promise.all(
@@ -58,6 +66,8 @@ export class MatchingService {
             source: job.source,
             sourceUrl: job.sourceUrl,
             score: job.score,
+            embedScore: job.embed_score,
+            trgmScore: job.trgm_score,
         });
 
         const recommended = topRows.map((job, i) => ({
