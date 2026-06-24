@@ -11,5 +11,6 @@ import { MatchHistoryModule } from '../match-history/match-history.module';
   imports: [EmbeddingModule, RedisModule, ResumeModule, MatchHistoryModule],
   controllers: [MatchingController],
   providers: [MatchingService, PrismaService],
+  exports: [MatchingService],
 })
 export class MatchingModule { }

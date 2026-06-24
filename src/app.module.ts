@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma.service';
@@ -15,7 +16,8 @@ import { ResumeModule } from './resume/resume.module';
 import { BookmarkModule } from './bookmark/bookmark.module';
 import { MatchHistoryModule } from './match-history/match-history.module';
 import { QueueModule } from './queue/queue.module';
-import { BullModule } from '@nestjs/bullmq';
+import { MailModule } from './mail/mail.module';
+import { AlertModule } from './alert/alert.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { BullModule } from '@nestjs/bullmq';
     BookmarkModule,
     MatchHistoryModule,
     QueueModule,
+    MailModule,
+    AlertModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
