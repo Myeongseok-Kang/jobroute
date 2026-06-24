@@ -19,4 +19,9 @@ export class CleaningController {
     deduplicate() {
         return this.cleaningService.deduplicate();
     }
+
+    @Post('extract-career-employment')
+    extractCareerEmployment() {
+        return this.cleaningService.extractCareerEmployment();
+    }
 }

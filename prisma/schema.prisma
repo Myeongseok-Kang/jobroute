@@ -25,6 +25,8 @@ model Job {
   contentHash String   @unique                // 중복 감지용 SHA256
   rawText     String                          // JD 원문 (내부 전용, 외부 노출 X)
   region      String?
+  careerMin       Int?
+  employmentType  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   mainTasks       String?
@@ -39,6 +41,8 @@ model Job {
   isIT       Boolean  @default(true)
   embedding  Unsupported("vector(1024)")?
   bookmarks Bookmark[]
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "idx_job_title_trgm", type: Gin)
+  @@index([company(ops: raw("gin_trgm_ops"))], map: "idx_job_company_trgm", type: Gin)
 }
 
 model User {

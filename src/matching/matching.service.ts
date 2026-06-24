@@ -18,6 +18,8 @@ export class MatchingService {
     async match(params: {
         text: string;
         region?: string;
+        userCareer?: number;        // (사용자) 경력 연차
+        employmentType?: string;    // (사용자) 희망 고용형태
         limit?: number;
     }) {
         const limit = params.limit ?? 20;
@@ -25,24 +27,54 @@ export class MatchingService {
         const [vec] = await this.embedding.embedQuery(params.text);
         const vecStr = `[${vec.join(',')}]`;
 
-        // isIT 필터 + 지역 필터 + 유사도 상위 N개
         const region = params.region ?? null;
+        const query = params.text;
+        const userCareer = params.userCareer ?? null;
+        const empType = params.employmentType ?? null;
+
+        // 임베딩 유사도(0.6) + trigram 유사도(0.25) + 경력 가중치 + 고용형태 가중치
         const rows = await this.prisma.$queryRaw`
       SELECT id, title, company, location, region, source, "sourceUrl",
              "mainTasks", "requirements", "preferredPoints",
-             1 - (embedding <=> ${vecStr}::vector) AS score
+             "careerMin", "employmentType",
+             1 - (embedding <=> ${vecStr}::vector) AS embed_score,
+             GREATEST(similarity(title, ${query}), similarity(company, ${query})) AS trgm_score,
+             CASE
+               WHEN ${userCareer}::int IS NULL OR "careerMin" IS NULL THEN 0
+               WHEN ${userCareer}::int >= "careerMin" THEN 0.1
+               WHEN ${userCareer}::int >= "careerMin" - 1 THEN 0.05
+               ELSE -0.05
+             END AS career_score,
+             CASE
+               WHEN ${empType}::text IS NULL OR "employmentType" IS NULL THEN 0
+               WHEN "employmentType" = ${empType}::text THEN 0.1
+               ELSE 0
+             END AS emp_score,
+             (0.6 * (1 - (embedding <=> ${vecStr}::vector))
+              + 0.25 * GREATEST(similarity(title, ${query}), similarity(company, ${query}))
+              + CASE
+                  WHEN ${userCareer}::int IS NULL OR "careerMin" IS NULL THEN 0
+                  WHEN ${userCareer}::int >= "careerMin" THEN 0.1
+                  WHEN ${userCareer}::int >= "careerMin" - 1 THEN 0.05
+                  ELSE -0.05
+                END
+              + CASE
+                  WHEN ${empType}::text IS NULL OR "employmentType" IS NULL THEN 0
+                  WHEN "employmentType" = ${empType}::text THEN 0.1
+                  ELSE 0
+                END
+             ) AS score
       FROM "Job"
       WHERE "duplicateOf" IS NULL
         AND embedding IS NOT NULL
         AND "isIT" = true
         AND (${region}::text IS NULL OR region = ${region})
-      ORDER BY embedding <=> ${vecStr}::vector
+      ORDER BY score DESC
       LIMIT ${limit}
     `;
 
         const rawRows = rows as any[];
 
-        // 상위 10개 근거 생성
         const TOP = 10;
         const topRows = rawRows.slice(0, TOP);
         const reasons = await Promise.all(
@@ -57,7 +89,13 @@ export class MatchingService {
             region: job.region,
             source: job.source,
             sourceUrl: job.sourceUrl,
+            careerMin: job.careerMin,
+            employmentType: job.employmentType,
             score: job.score,
+            embedScore: job.embed_score,
+            trgmScore: job.trgm_score,
+            careerScore: job.career_score,
+            empScore: job.emp_score,
         });
 
         const recommended = topRows.map((job, i) => ({
@@ -75,13 +113,13 @@ export class MatchingService {
     }
 
     async matchByConditions(params: {
-        jobCategory?: string;      // 직무
-        skills?: string[];         // 기술 스택
-        career?: string;           // 경력
+        jobCategory?: string;
+        skills?: string[];
+        career?: string;
+        employmentType?: string;
         region?: string;
         limit?: number;
     }) {
-        // 조건 -> 자연어 문장
         const parts: string[] = [];
         if (params.jobCategory) parts.push(`${params.jobCategory} 개발자`);
         if (params.skills?.length) parts.push(`${params.skills.join(', ')} 사용`);
@@ -89,9 +127,21 @@ export class MatchingService {
 
         const text = parts.join('. ');
 
+        // 숫자만 뽑기
+        let userCareer: number | undefined;
+        if (params.career) {
+            if (/신입|무관/.test(params.career)) userCareer = 0;
+            else {
+                const m = params.career.match(/(\d+)/);
+                if (m) userCareer = parseInt(m[1], 10);
+            }
+        }
+
         return this.match({
             text,
             region: params.region,
+            userCareer,
+            employmentType: params.employmentType,
             limit: params.limit,
         });
     }
