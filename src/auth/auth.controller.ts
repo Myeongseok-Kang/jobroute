@@ -2,6 +2,8 @@ import { Body, Controller, Get, Post, UseGuards, Request } from '@nestjs/common'
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { Res } from '@nestjs/common';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -29,8 +31,10 @@ export class AuthController {
 
     @UseGuards(AuthGuard('google'))
     @Get('google/callback')
-    googleCallback(@Request() req: any) {
-        return this.auth.socialLogin(req.user);
+    async googleCallback(@Request() req: any, @Res() res: Response) {
+        const { accessToken } = await this.auth.socialLogin(req.user);
+        const front = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+        res.redirect(`${front}/auth/callback?accessToken=${accessToken}`);
     }
 
     @UseGuards(AuthGuard('kakao'))
@@ -39,7 +43,9 @@ export class AuthController {
 
     @UseGuards(AuthGuard('kakao'))
     @Get('kakao/callback')
-    kakaoCallback(@Request() req: any) {
-        return this.auth.socialLogin(req.user);
+    async kakaoCallback(@Request() req: any, @Res() res: Response) {
+        const { accessToken } = await this.auth.socialLogin(req.user);
+        const front = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+        res.redirect(`${front}/auth/callback?accessToken=${accessToken}`);
     }
 }
