@@ -18,6 +18,8 @@ import { MatchHistoryModule } from './match-history/match-history.module';
 import { QueueModule } from './queue/queue.module';
 import { MailModule } from './mail/mail.module';
 import { AlertModule } from './alert/alert.module';
+import { InterviewModule } from './interview/interview.module';
+import { CoverLetterModule } from './cover-letter/cover-letter.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { AlertModule } from './alert/alert.module';
     QueueModule,
     MailModule,
     AlertModule,
+    InterviewModule,
+    CoverLetterModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
