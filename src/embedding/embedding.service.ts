@@ -4,6 +4,7 @@ import { VoyageAIClient } from 'voyageai';
 import { buildEmbeddingText } from './build-embedding-text';
 import { createHash } from 'crypto';
 import { RedisService } from '../redis/redis.service';
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
 
 @Injectable()
 export class EmbeddingService {
@@ -13,17 +14,20 @@ export class EmbeddingService {
     constructor(
         private prisma: PrismaService,
         private redis: RedisService,
+        private breaker: CircuitBreakerService,
     ) { }
 
     private async embedDocuments(texts: string[], retries = 5): Promise<number[][]> {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const res = await this.voyage.embed({
-                    model: 'voyage-4-large',
-                    input: texts,
-                    inputType: 'document',
-                    outputDimension: 1024,
-                });
+                const res = await this.breaker.fire('voyage', () =>
+                    this.voyage.embed({
+                        model: 'voyage-4-large',
+                        input: texts,
+                        inputType: 'document',
+                        outputDimension: 1024,
+                    }),
+                );
                 return res.data!.map((d) => d.embedding!);
             } catch (e: any) {
                 const status = e?.statusCode ?? e?.status;
@@ -146,12 +150,14 @@ export class EmbeddingService {
 
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const res = await this.voyage.embed({
-                    model: 'voyage-4-large',
-                    input: [text],
-                    inputType: 'query',
-                    outputDimension: 1024,
-                });
+                const res = await this.breaker.fire('voyage', () =>
+                    this.voyage.embed({
+                        model: 'voyage-4-large',
+                        input: [text],
+                        inputType: 'query',
+                        outputDimension: 1024,
+                    }),
+                );
                 const vec = res.data!.map((d) => d.embedding!);
                 await this.redis.set(key, vec[0], 60 * 60 * 24 * 7); // 7일
                 return vec;
