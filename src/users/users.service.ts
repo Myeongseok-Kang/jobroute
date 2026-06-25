@@ -38,7 +38,15 @@ export class UsersService {
         });
         if (existing) return existing;
 
-        // 가입하지 않았다면
+        // 계정 통합
+        if (params.email) {
+            const byEmail = await this.prisma.user.findUnique({
+                where: { email: params.email },
+            });
+            if (byEmail) return byEmail;
+        }
+
+        // 신규 생성
         return this.prisma.user.create({
             data: {
                 provider: params.provider,
