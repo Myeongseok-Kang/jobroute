@@ -20,6 +20,7 @@ import { MailModule } from './mail/mail.module';
 import { AlertModule } from './alert/alert.module';
 import { InterviewModule } from './interview/interview.module';
 import { CoverLetterModule } from './cover-letter/cover-letter.module';
+import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CoverLetterModule } from './cover-letter/cover-letter.module';
       },
     }),
     RedisModule,
+    CircuitBreakerModule,
     JobsModule,
     ScraperModule,
     CleaningModule,

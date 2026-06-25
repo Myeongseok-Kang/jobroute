@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { createHash } from 'crypto';
 import OpenAI from 'openai';
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
 
 @Injectable()
 export class InterviewService {
@@ -11,6 +12,7 @@ export class InterviewService {
     constructor(
         private prisma: PrismaService,
         private redis: RedisService,
+        private breaker: CircuitBreakerService,
     ) { }
 
     async generate(jobId: string, resumeText?: string) {
@@ -80,14 +82,16 @@ ${resumeText ? '- 이력서에 없는 약점을 지적할 땐 비난조가 아�
             ? `[채용공고]\n${jobText}\n\n[지원자 이력서]\n${resumeText}`
             : `[채용공고]\n${jobText}`;
 
-        const res = await this.openai.chat.completions.create({
-            model: 'gpt-5-mini',
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: system },
-                { role: 'user', content: userContent },
-            ],
-        });
+        const res = await this.breaker.fire('openai', () =>
+            this.openai.chat.completions.create({
+                model: 'gpt-5-mini',
+                response_format: { type: 'json_object' },
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: userContent },
+                ],
+            }),
+        );
 
         let parsed: any;
         try {

@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 import { VoyageAIClient } from 'voyageai';
 import OpenAI from 'openai';
 import { NotFoundException } from '@nestjs/common';
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
 
 @Injectable()
 export class CoverLetterService {
@@ -14,7 +15,10 @@ export class CoverLetterService {
     private readonly ua =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private breaker: CircuitBreakerService,
+    ) { }
 
     async scrapeCoverLetters(maxPage = 5) {
         let saved = 0;
@@ -173,12 +177,14 @@ export class CoverLetterService {
     private async embedDocuments(texts: string[], retries = 5): Promise<number[][]> {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const res = await this.voyage.embed({
-                    model: 'voyage-4-large',
-                    input: texts,
-                    inputType: 'document',
-                    outputDimension: 1024,
-                });
+                const res = await this.breaker.fire('voyage', () =>
+                    this.voyage.embed({
+                        model: 'voyage-4-large',
+                        input: texts,
+                        inputType: 'document',
+                        outputDimension: 1024,
+                    }),
+                );
                 return res.data!.map((d) => d.embedding!);
             } catch (e: any) {
                 const status = e?.statusCode ?? e?.status;
@@ -197,12 +203,14 @@ export class CoverLetterService {
     private async embedQuery(text: string, retries = 5): Promise<number[]> {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const res = await this.voyage.embed({
-                    model: 'voyage-4-large',
-                    input: [text],
-                    inputType: 'query',
-                    outputDimension: 1024,
-                });
+                const res = await this.breaker.fire('voyage', () =>
+                    this.voyage.embed({
+                        model: 'voyage-4-large',
+                        input: [text],
+                        inputType: 'query',
+                        outputDimension: 1024,
+                    }),
+                );
                 return res.data![0].embedding!;
             } catch (e: any) {
                 const status = e?.statusCode ?? e?.status;
@@ -300,14 +308,16 @@ AI가 쓴 듯한 정형화된 문투를 피하고 사람이 직접 쓴 것처럼
 
         const userContent = `[지원자 이력서]\n${resumeText}\n\n[채용공고]\n${jobText}\n\n[참고할 합격자소서 예시]\n${sampleText}`;
 
-        const res = await this.openai.chat.completions.create({
-            model: 'gpt-5-mini',
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: system },
-                { role: 'user', content: userContent },
-            ],
-        });
+        const res = await this.breaker.fire('openai', () =>
+            this.openai.chat.completions.create({
+                model: 'gpt-5-mini',
+                response_format: { type: 'json_object' },
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: userContent },
+                ],
+            }),
+        );
 
         let parsed: any;
         try {
@@ -361,14 +371,16 @@ AI가 쓴 듯한 정형화된 문투를 피하고 사람이 직접 쓴 것처럼
 
         const userContent = `[지원자가 쓴 자소서]\n${userCoverLetter}\n\n[참고할 합격자소서 예시]\n${sampleText}`;
 
-        const res = await this.openai.chat.completions.create({
-            model: 'gpt-5-mini',
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: system },
-                { role: 'user', content: userContent },
-            ],
-        });
+        const res = await this.breaker.fire('openai', () =>
+            this.openai.chat.completions.create({
+                model: 'gpt-5-mini',
+                response_format: { type: 'json_object' },
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: userContent },
+                ],
+            }),
+        );
 
         let parsed: any;
         try {

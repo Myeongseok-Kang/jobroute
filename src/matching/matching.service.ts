@@ -4,6 +4,7 @@ import { EmbeddingService } from '../embedding/embedding.service';
 import OpenAI from 'openai';
 import { RedisService } from '../redis/redis.service';
 import { createHash } from 'crypto';
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
 
 @Injectable()
 export class MatchingService {
@@ -13,6 +14,7 @@ export class MatchingService {
         private prisma: PrismaService,
         private embedding: EmbeddingService,
         private redis: RedisService,
+        private breaker: CircuitBreakerService,
     ) { }
 
     async match(params: {
@@ -205,14 +207,16 @@ export class MatchingService {
   "confirm": ["이 공고는 5년 이상 경력을 요구하는데 지원자님은 3년차이므로, 요구 연차와의 차이를 지원 전에 확인해 보시는 것이 좋습니다."]
 }`;
 
-        const res = await this.openai.chat.completions.create({
-            model: 'gpt-5-mini',
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: system },
-                { role: 'user', content: `[지원자 정보]\n${resume}\n\n[채용공고]\n${jobText}` },
-            ],
-        });
+        const res = await this.breaker.fire('openai', () =>
+            this.openai.chat.completions.create({
+                model: 'gpt-5-mini',
+                response_format: { type: 'json_object' },
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: `[지원자 정보]\n${resume}\n\n[채용공고]\n${jobText}` },
+                ],
+            }),
+        );
 
         let parsed: any;
         try {

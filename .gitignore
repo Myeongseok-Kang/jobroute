@@ -28,6 +28,9 @@ lerna-debug.log*
 .settings/
 *.sublime-workspace
 
+# Claude Code 로컬 설정
+.claude/
+
 # IDE - VSCode
 .vscode/*
 !.vscode/settings.json
