@@ -103,3 +103,15 @@ model AlertSetting {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
+
+model CoverLetterSample {
+  id          String   @id @default(uuid())
+  source      String   @default("jobkorea")   // 출처
+  sourceUrl   String?                          // 원본 링크
+  company     String?                          // 기업명
+  jobCategory String?                          // 직무
+  content     String                           // 자소서 전문
+  contentHash String   @unique                 // 중복 방지
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime @default(now())
+}
