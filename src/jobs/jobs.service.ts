@@ -23,6 +23,8 @@ export class JobsService {
     q?: string;
     region?: string;
     source?: string;
+    employmentType?: string;
+    career?: string;
     sort?: string;
     page?: number;
     size?: number;
@@ -44,6 +46,9 @@ export class JobsService {
     }
     if (params.region) where.region = params.region;
     if (params.source) where.source = params.source;
+    if (params.employmentType) where.employmentType = params.employmentType;
+    if (params.career === '신입') where.careerMin = 0;
+    else if (params.career === '경력') where.careerMin = { gte: 1 };
 
     const orderBy =
       params.sort === 'oldest'
