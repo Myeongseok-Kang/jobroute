@@ -107,7 +107,7 @@ export class ScraperService {
         if (!res.ok) {
           this.logger.warn(`공고 ${wantedId} 상세 실패: ${res.status}`);
           failed++;
-          await this.sleep(1000);
+          await this.sleep(900);
           continue;
         }
 
@@ -117,7 +117,7 @@ export class ScraperService {
         if (!detail) {
           this.logger.warn(`공고 ${wantedId} detail 없음`);
           failed++;
-          await this.sleep(1000);
+          await this.sleep(900);
           continue;
         }
 
@@ -152,7 +152,7 @@ export class ScraperService {
         failed++;
       }
 
-      await this.sleep(1000);
+      await this.sleep(900);
     }
 
     const remaining = await this.prisma.job.count({
@@ -227,7 +227,7 @@ export class ScraperService {
       }
 
       this.logger.log(`사람인 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
-      await this.sleep(1);
+      await this.sleep(900);
     }
 
     this.logger.log(`사람인 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
@@ -268,7 +268,7 @@ export class ScraperService {
         if (!res.ok) {
           this.logger.warn(`사람인 ${recIdx} 상세 실패: ${res.status}`);
           failed++;
-          await this.sleep(1);
+          await this.sleep(900);
           continue;
         }
 
@@ -293,7 +293,7 @@ export class ScraperService {
         failed++;
       }
 
-      await this.sleep(1);
+      await this.sleep(900);
     }
 
     const remaining = await this.prisma.job.count({
@@ -419,7 +419,7 @@ export class ScraperService {
       }
 
       this.logger.log(`잡코리아 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
-      await this.sleep(1500);
+      await this.sleep(900);
     }
 
     this.logger.log(`잡코리아 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
@@ -489,7 +489,7 @@ export class ScraperService {
         failed++;
       }
 
-      await this.sleep(1200);
+      await this.sleep(900);
     }
 
     const remaining = await this.prisma.job.count({
