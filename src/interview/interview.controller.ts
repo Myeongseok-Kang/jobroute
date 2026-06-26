@@ -1,8 +1,10 @@
 import { Controller, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { InterviewService } from './interview.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
 
+@Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('interview')
 export class InterviewController {
     constructor(
