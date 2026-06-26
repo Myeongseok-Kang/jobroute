@@ -36,13 +36,13 @@ export class MatchingService {
         const userCareer = params.userCareer ?? null;
         const empType = params.employmentType ?? null;
 
-        // 임베딩 유사도(0.6) + trigram 유사도(0.25) + 경력 가중치 + 고용형태 가중치
+        // 임베딩 유사도(0.7) + trigram 유사도(0.3) + 경력 가중치 + 고용형태 가중치
         const rows = await this.prisma.$queryRaw`
       SELECT id, title, company, location, region, source, "sourceUrl",
              "mainTasks", "requirements", "preferredPoints",
              "careerMin", "employmentType",
              1 - (embedding <=> ${vecStr}::vector) AS embed_score,
-             GREATEST(similarity(title, ${query}), similarity(company, ${query})) AS trgm_score,
+             GREATEST(word_similarity(title, ${query}), word_similarity(company, ${query})) AS trgm_score,
              CASE
                WHEN ${userCareer}::int IS NULL OR "careerMin" IS NULL THEN 0
                WHEN ${userCareer}::int >= "careerMin" THEN 0.1
@@ -54,8 +54,8 @@ export class MatchingService {
                WHEN "employmentType" = ${empType}::text THEN 0.1
                ELSE 0
              END AS emp_score,
-             (0.6 * (1 - (embedding <=> ${vecStr}::vector))
-              + 0.25 * GREATEST(similarity(title, ${query}), similarity(company, ${query}))
+             (0.7 * (1 - (embedding <=> ${vecStr}::vector))
+              + 0.3 * GREATEST(word_similarity(title, ${query}), word_similarity(company, ${query}))
               + CASE
                   WHEN ${userCareer}::int IS NULL OR "careerMin" IS NULL THEN 0
                   WHEN ${userCareer}::int >= "careerMin" THEN 0.1
