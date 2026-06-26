@@ -27,7 +27,7 @@ export class CollectProcessor extends WorkerHost {
         // 상세
         await this.runDetails('saramin');
         await this.runDetails('jobkorea');
-        await this.scraper.scrapeWanted();
+        await this.runDetails('wanted');
 
         this.logger.log('수집 완료 - 임베딩 큐에 작업 투입');
 
