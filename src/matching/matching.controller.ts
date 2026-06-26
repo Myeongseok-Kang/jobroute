@@ -14,7 +14,13 @@ export class MatchingController {
     ) { }
 
     @Post()
-    match(@Body() body: { text: string; region?: string; limit?: number }) {
+    match(@Body() body: {
+        text: string;
+        userCareer?: number;
+        employmentType?: string;
+        region?: string;
+        limit?: number;
+    }) {
         return this.matchingService.match(body);
     }
 
@@ -23,6 +29,7 @@ export class MatchingController {
         jobCategory?: string;
         skills?: string[];
         career?: string;
+        employmentType?: string;
         region?: string;
         limit?: number;
     }) {
@@ -34,11 +41,13 @@ export class MatchingController {
     async matchByResume(
         @Request() req: any,
         @Param('id') id: string,
-        @Body() body: { region?: string; limit?: number },
+        @Body() body: { userCareer?: number; employmentType?: string; region?: string; limit?: number },
     ) {
         const resume = await this.resumeService.findOne(req.user.id, id);
         const result = await this.matchingService.match({
             text: resume.content,
+            userCareer: body.userCareer,
+            employmentType: body.employmentType,
             region: body.region,
             limit: body.limit,
         });
