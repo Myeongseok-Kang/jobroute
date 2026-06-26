@@ -1,4 +1,4 @@
-import { Controller, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { InterviewService } from './interview.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
@@ -19,8 +19,15 @@ export class InterviewController {
     // 공고 + 이력서
     @UseGuards(JwtAuthGuard)
     @Post(':jobId/personalized')
-    async personalized(@Request() req: any, @Param('jobId') jobId: string) {
-        const resume = await this.resumeService.findLatest(req.user.id);
-        return this.interview.generate(jobId, resume?.content);
+    async personalized(
+        @Request() req: any,
+        @Param('jobId') jobId: string,
+        @Body() body: { resumeId?: string },
+    ) {
+        const resume = body.resumeId
+            ? await this.resumeService.findOne(req.user.id, body.resumeId)
+            : await this.resumeService.findLatest(req.user.id);
+        if (!resume) return { error: '이력서가 없습니다. 먼저 이력서를 등록해주세요.' };
+        return this.interview.generate(jobId, resume.content);
     }
 }
