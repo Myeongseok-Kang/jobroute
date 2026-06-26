@@ -1,10 +1,12 @@
 import { Body, Controller, Post, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { MatchingService } from './matching.service';
 import { UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
 import { MatchHistoryService } from '../match-history/match-history.service';
 
+@Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('matching')
 export class MatchingController {
     constructor(

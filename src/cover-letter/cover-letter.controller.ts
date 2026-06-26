@@ -1,8 +1,10 @@
 import { Controller, Post, Query, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CoverLetterService } from './cover-letter.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
 
+@Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('cover-letter')
 export class CoverLetterController {
     constructor(

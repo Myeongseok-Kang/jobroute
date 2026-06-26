@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma.service';
@@ -25,6 +27,7 @@ import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 200 }]),
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST ?? 'localhost',
@@ -50,6 +53,10 @@ import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
     CoverLetterModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [
+    AppService,
+    PrismaService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule { }
