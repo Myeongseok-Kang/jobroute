@@ -1,0 +1,15 @@
+node_modules
+dist
+generated
+coverage
+.git
+.gitignore
+.env
+.env.*
+*.log
+jobroute_backup.dump
+Dockerfile
+docker-compose*.yml
+.dockerignore
+README.md
+DEPLOY.md
