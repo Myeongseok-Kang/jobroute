@@ -50,6 +50,7 @@ model User {
   email      String?  @unique
   password   String?
   name       String?
+  image      String?
   provider   String   @default("local")
   providerId String?
   createdAt  DateTime @default(now())
