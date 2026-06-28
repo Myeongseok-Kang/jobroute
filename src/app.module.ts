@@ -23,6 +23,7 @@ import { AlertModule } from './alert/alert.module';
 import { InterviewModule } from './interview/interview.module';
 import { CoverLetterModule } from './cover-letter/cover-letter.module';
 import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
     AlertModule,
     InterviewModule,
     CoverLetterModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [

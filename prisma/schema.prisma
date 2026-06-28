@@ -60,8 +60,18 @@ model User {
   bookmarks Bookmark[]
   matchHistories MatchHistory[]
   alertSetting AlertSetting?
+  feedbacks Feedback[]
 
   @@unique([provider, providerId])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  phone     String?
+  createdAt DateTime @default(now())
 }
 
 model Resume {
