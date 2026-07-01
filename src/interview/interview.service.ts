@@ -85,6 +85,7 @@ ${resumeText ? '- 이력서에 없는 약점을 지적할 땐 비난조가 아�
         const res = await this.breaker.fire('openai', () =>
             this.openai.chat.completions.create({
                 model: 'gpt-5-mini',
+                reasoning_effort: 'low',
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: system },

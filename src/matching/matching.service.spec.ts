@@ -36,6 +36,9 @@ const llmResponse = (content: string) => ({
 
 const validReason = { summary: '핵심 기술이 맞습니다.', matches: ['Node.js'], confirm: [] };
 
+const batchResponse = (reasons: unknown[]) =>
+  llmResponse(JSON.stringify({ reasons }));
+
 describe('MatchingService', () => {
   let service: MatchingService;
 
@@ -49,7 +52,8 @@ describe('MatchingService', () => {
 
     embedding.embedQuery.mockResolvedValue([[0.1, 0.2, 0.3]]);
     redis.get.mockResolvedValue(null);
-    breaker.fire.mockResolvedValue(llmResponse(JSON.stringify(validReason)));
+    // 호출 한 번으로 근거 5개
+    breaker.fire.mockResolvedValue(batchResponse(Array(5).fill(validReason)));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,18 +78,19 @@ describe('MatchingService', () => {
       expect(embedding.embedQuery).toHaveBeenCalledWith('3년차 백엔드 NestJS');
     });
 
-    it('상위 10건은 추천 나머지는 후보', async () => {
+    it('상위 5건은 추천 나머지는 후보', async () => {
       const rows = Array.from({ length: 12 }, (_, i) => makeRow(i));
       prisma.$queryRaw.mockResolvedValue(rows);
 
       const result = await service.match({ text: '백엔드' });
 
       expect(result.total).toBe(12);
-      expect(result.recommended).toHaveLength(10);
-      expect(result.moreCandidates).toHaveLength(2);
+      expect(result.recommended).toHaveLength(5);
+      expect(result.moreCandidates).toHaveLength(7);
       expect(result.recommended[0].reason).toEqual(validReason);
       expect(result.moreCandidates[0]).not.toHaveProperty('reason');
-      expect(breaker.fire).toHaveBeenCalledTimes(10);
+
+      expect(breaker.fire).toHaveBeenCalledTimes(1);
     });
 
     it('DB 점수 컬럼을 응답 필드명으로 변환', async () => {
