@@ -311,6 +311,7 @@ AI가 쓴 듯한 정형화된 문투를 피하고 사람이 직접 쓴 것처럼
         const res = await this.breaker.fire('openai', () =>
             this.openai.chat.completions.create({
                 model: 'gpt-5-mini',
+                reasoning_effort: 'low',
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: system },
@@ -374,6 +375,7 @@ AI가 쓴 듯한 정형화된 문투를 피하고 사람이 직접 쓴 것처럼
         const res = await this.breaker.fire('openai', () =>
             this.openai.chat.completions.create({
                 model: 'gpt-5-mini',
+                reasoning_effort: 'low',
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: system },

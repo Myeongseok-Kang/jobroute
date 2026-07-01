@@ -80,11 +80,9 @@ export class MatchingService {
 
         const rawRows = rows as any[];
 
-        const TOP = 10;
+        const TOP = 5;
         const topRows = rawRows.slice(0, TOP);
-        const reasons = await Promise.all(
-            topRows.map((job) => this.generateReason(params.text, job)),
-        );
+        const reasons = await this.generateReasons(params.text, topRows);
 
         const slim = (job: any) => ({
             id: job.id,
@@ -151,14 +149,46 @@ export class MatchingService {
         });
     }
 
-    private async generateReason(resume: string, job: any) {
-        const key = `reason:${createHash('sha256').update(resume).digest('hex')}:${job.id}`;
-        const cached = await this.redis.get<any>(key);
-        if (cached) {
-            return cached;
+    private async generateReasons(resume: string, jobs: any[]): Promise<any[]> {
+        if (jobs.length === 0) return [];
+
+        const resumeHash = createHash('sha256').update(resume).digest('hex');
+        const keys = jobs.map((job) => `reason:${resumeHash}:${job.id}`);
+        const results = await Promise.all(keys.map((k) => this.redis.get<any>(k)));
+
+        const missIdx: number[] = [];
+        for (let i = 0; i < jobs.length; i++) {
+            if (!results[i]) missIdx.push(i);
         }
 
-        const jobText = [
+        if (missIdx.length > 0) {
+            const missJobs = missIdx.map((i) => jobs[i]);
+            const generated = await this.generateReasonBatch(resume, missJobs);
+            await Promise.all(
+                missIdx.map((origIdx, k) => {
+                    const val = generated[k] ?? { summary: '', matches: [], confirm: [] };
+                    results[origIdx] = val;
+
+                    if (this.isEmptyReason(val)) return Promise.resolve();
+                    return this.redis.set(keys[origIdx], val, 60 * 60 * 24);
+                }),
+            );
+        }
+
+        return results;
+    }
+
+    private isEmptyReason(r: any): boolean {
+        return (
+            !r ||
+            (!r.summary &&
+                (!r.matches || r.matches.length === 0) &&
+                (!r.confirm || r.confirm.length === 0))
+        );
+    }
+
+    private jobToText(job: any): string {
+        return [
             `제목: ${job.title}`,
             `회사: ${job.company}`,
             job.location ? `근무지: ${job.location}` : '',
@@ -166,6 +196,12 @@ export class MatchingService {
             job.requirements ? `자격요건: ${job.requirements}` : '',
             job.preferredPoints ? `우대사항: ${job.preferredPoints}` : '',
         ].filter(Boolean).join('\n');
+    }
+
+    private async generateReasonBatch(resume: string, jobs: any[]): Promise<any[]> {
+        const jobsText = jobs
+            .map((job, i) => `[공고 ${i + 1}]\n${this.jobToText(job)}`)
+            .join('\n\n');
 
         const system = `너는 IT 취업 매칭 서비스의 분석 어시스턴트야
 지원자 정보와 채용공고를 대조해서 이 공고가 왜 지원자에게 맞는지 근거를 뽑아내는 게 너의 역할이야
@@ -189,43 +225,55 @@ export class MatchingService {
 - 출력(summary, matches, confirm)은 사용자에게 보여주는 내용이니 존댓말로 써. 지원자를 존중하는 톤으로
 
 출력 형식
+여러 공고가 [공고 1], [공고 2] ... 순서로 주어져. 각 공고마다 하나씩 근거를 만들어서 입력과 같은 순서로 reasons 배열에 담아
 아래 JSON으로만 답해. 다른 말 붙이지 마
 {
-  "summary": "이 공고를 추천하는 핵심 이유 (2문장, 존댓말)",
-  "matches": ["겹치는 지점을 구체적으로 설명 (무엇↔무엇이 맞고, 그게 왜 의미 있는지까지)"],
-  "confirm": ["확인하거나 보완하면 좋을 점과, 그 이유"]
+  "reasons": [
+    {
+      "summary": "이 공고를 추천하는 핵심 이유 (2문장, 존댓말)",
+      "matches": ["겹치는 지점을 구체적으로 설명 (무엇↔무엇이 맞고, 그게 왜 의미 있는지까지)"],
+      "confirm": ["확인하거나 보완하면 좋을 점과, 그 이유"]
+    }
+  ]
 }
-- matches는 2~4개, confirm은 1~2개
+- reasons 배열의 길이는 입력으로 주어진 공고 개수와 정확히 같아야 하고, 순서도 같아야 해
+- 각 공고의 matches는 2~4개, confirm은 1~2개
 - 각 항목은 단답이 아니라 2문장 정도로 풀어서 지원자가 납득할 수 있게 설명해
 
 예시
-입력: 지원자 "3년차 백엔드, Node.js/Express, AWS 배포 경험" / 공고 "Nest.js 백엔드 5년 이상, AWS 환경"
+입력: 지원자 "3년차 백엔드, Node.js/Express, AWS 배포 경험" / [공고 1] "Nest.js 백엔드 5년 이상, AWS 환경"
 출력:
 {
-  "summary": "지원자님의 Node.js 백엔드 경험과 AWS 운영 경험이 이 공고의 핵심 요건과 직접 맞닿아 있습니다. 같은 기술 생태계에서 쌓은 경험이라 적응 부담이 적을 것으로 보입니다.",
-  "matches": ["지원자님이 사용해 온 Express는 이 공고가 요구하는 Nest.js와 같은 Node.js 생태계라, 프레임워크 전환에 드는 학습 비용이 크지 않습니다.", "AWS에 직접 배포해 본 경험이 있어, 공고에서 요구하는 AWS 환경에서의 운영 업무에 바로 투입되기 수월합니다."],
-  "confirm": ["이 공고는 5년 이상 경력을 요구하는데 지원자님은 3년차이므로, 요구 연차와의 차이를 지원 전에 확인해 보시는 것이 좋습니다."]
+  "reasons": [
+    {
+      "summary": "지원자님의 Node.js 백엔드 경험과 AWS 운영 경험이 이 공고의 핵심 요건과 직접 맞닿아 있습니다. 같은 기술 생태계에서 쌓은 경험이라 적응 부담이 적을 것으로 보입니다.",
+      "matches": ["지원자님이 사용해 온 Express는 이 공고가 요구하는 Nest.js와 같은 Node.js 생태계라, 프레임워크 전환에 드는 학습 비용이 크지 않습니다.", "AWS에 직접 배포해 본 경험이 있어, 공고에서 요구하는 AWS 환경에서의 운영 업무에 바로 투입되기 수월합니다."],
+      "confirm": ["이 공고는 5년 이상 경력을 요구하는데 지원자님은 3년차이므로, 요구 연차와의 차이를 지원 전에 확인해 보시는 것이 좋습니다."]
+    }
+  ]
 }`;
 
         const res = await this.breaker.fire('openai', () =>
             this.openai.chat.completions.create({
                 model: 'gpt-5-mini',
+                reasoning_effort: 'low',
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: system },
-                    { role: 'user', content: `[지원자 정보]\n${resume}\n\n[채용공고]\n${jobText}` },
+                    { role: 'user', content: `[지원자 정보]\n${resume}\n\n[채용공고 목록]\n${jobsText}` },
                 ],
             }),
         );
 
+        const empty = { summary: '', matches: [], confirm: [] };
         let parsed: any;
         try {
             parsed = JSON.parse(res.choices[0].message.content ?? '{}');
         } catch {
-            return { summary: '', matches: [], confirm: [] };
+            return jobs.map(() => ({ ...empty }));
         }
 
-        await this.redis.set(key, parsed, 60 * 60 * 24);
-        return parsed;
+        const arr = Array.isArray(parsed?.reasons) ? parsed.reasons : [];
+        return jobs.map((_, i) => arr[i] ?? { ...empty });
     }
 }
