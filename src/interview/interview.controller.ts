@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { InterviewService } from './interview.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
+import { PersonalizedDto } from './dto/interview.dto';
 
 @Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('interview')
@@ -24,7 +25,7 @@ export class InterviewController {
     async personalized(
         @Request() req: any,
         @Param('jobId') jobId: string,
-        @Body() body: { resumeId?: string },
+        @Body() body: PersonalizedDto,
     ) {
         const resume = body.resumeId
             ? await this.resumeService.findOne(req.user.id, body.resumeId)
