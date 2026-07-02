@@ -1,6 +1,8 @@
-import { Controller, Post, Query } from '@nestjs/common';
+import { Controller, Post, Query, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard';
 import { ScraperService } from './scraper.service';
 
+@UseGuards(AdminGuard)
 @Controller('scraper')
 export class ScraperController {
   constructor(private readonly scraperService: ScraperService) { }

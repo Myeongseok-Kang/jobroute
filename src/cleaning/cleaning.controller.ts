@@ -1,6 +1,8 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Post, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard';
 import { CleaningService } from './cleaning.service';
 
+@UseGuards(AdminGuard)
 @Controller('cleaning')
 export class CleaningController {
     constructor(private readonly cleaningService: CleaningService) { }

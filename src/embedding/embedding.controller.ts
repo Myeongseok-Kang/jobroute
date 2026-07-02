@@ -1,15 +1,18 @@
-import { Controller, Post, Get, Query, Header } from '@nestjs/common';
+import { Controller, Post, Get, Query, Header, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard';
 import { EmbeddingService } from './embedding.service';
 
 @Controller('embedding')
 export class EmbeddingController {
     constructor(private readonly embeddingService: EmbeddingService) { }
 
+    @UseGuards(AdminGuard)
     @Post('sample')
     sample() {
         return this.embeddingService.embedSample();
     }
 
+    @UseGuards(AdminGuard)
     @Post('all')
     all() {
         return this.embeddingService.embedAll();
@@ -20,11 +23,13 @@ export class EmbeddingController {
         return this.embeddingService.search(q);
     }
 
+    @UseGuards(AdminGuard)
     @Post('flag-non-it')
     flagNonIT(@Query('threshold') threshold?: string) {
         return this.embeddingService.flagNonIT(threshold ? parseFloat(threshold) : 0.1);
     }
 
+    @UseGuards(AdminGuard)
     @Get('debug')
     debug(
         @Query('min') min?: string,
