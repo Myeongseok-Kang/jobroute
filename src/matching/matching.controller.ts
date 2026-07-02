@@ -5,6 +5,7 @@ import { UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
 import { MatchHistoryService } from '../match-history/match-history.service';
+import { MatchByResumeDto, MatchConditionsDto, MatchDto } from './dto/matching.dto';
 
 @Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('matching')
@@ -16,25 +17,12 @@ export class MatchingController {
     ) { }
 
     @Post()
-    match(@Body() body: {
-        text: string;
-        userCareer?: number;
-        employmentType?: string;
-        region?: string;
-        limit?: number;
-    }) {
+    match(@Body() body: MatchDto) {
         return this.matchingService.match(body);
     }
 
     @Post('conditions')
-    matchByConditions(@Body() body: {
-        jobCategory?: string;
-        skills?: string[];
-        career?: string;
-        employmentType?: string;
-        region?: string;
-        limit?: number;
-    }) {
+    matchByConditions(@Body() body: MatchConditionsDto) {
         return this.matchingService.matchByConditions(body);
     }
 
@@ -43,7 +31,7 @@ export class MatchingController {
     async matchByResume(
         @Request() req: any,
         @Param('id') id: string,
-        @Body() body: { userCareer?: number; employmentType?: string; region?: string; limit?: number },
+        @Body() body: MatchByResumeDto,
     ) {
         const resume = await this.resumeService.findOne(req.user.id, id);
         const result = await this.matchingService.match({

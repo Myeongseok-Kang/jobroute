@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from './resume.service';
+import { CreateResumeDto, UpdateResumeDto } from './dto/resume.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('resume')
@@ -10,7 +11,7 @@ export class ResumeController {
     constructor(private resume: ResumeService) { }
 
     @Post()
-    create(@Request() req: any, @Body() body: { content: string; title?: string }) {
+    create(@Request() req: any, @Body() body: CreateResumeDto) {
         return this.resume.create(req.user.id, body.content, body.title);
     }
 
@@ -25,7 +26,7 @@ export class ResumeController {
     }
 
     @Patch(':id')
-    update(@Request() req: any, @Param('id') id: string, @Body() body: { content?: string; title?: string }) {
+    update(@Request() req: any, @Param('id') id: string, @Body() body: UpdateResumeDto) {
         return this.resume.update(req.user.id, id, body);
     }
 

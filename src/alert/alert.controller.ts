@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
 import { AlertService } from './alert.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SetAlertDto } from './dto/alert.dto';
 
 @Controller('alert')
 export class AlertController {
@@ -14,7 +15,7 @@ export class AlertController {
 
     @UseGuards(JwtAuthGuard)
     @Post()
-    set(@Request() req: any, @Body() body: { enabled: boolean; resumeId?: string }) {
+    set(@Request() req: any, @Body() body: SetAlertDto) {
         return this.alert.setEnabled(req.user.id, body.enabled, body.resumeId);
     }
 }

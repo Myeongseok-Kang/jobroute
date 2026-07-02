@@ -5,6 +5,14 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { Res } from '@nestjs/common';
 import type { Response } from 'express';
+import {
+    ChangePasswordDto,
+    ForgotPasswordDto,
+    LoginDto,
+    RegisterDto,
+    ResetPasswordDto,
+    UpdateMeDto,
+} from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -14,12 +22,12 @@ export class AuthController {
     ) { }
 
     @Post('register')
-    register(@Body() body: { email: string; password: string; name?: string }) {
+    register(@Body() body: RegisterDto) {
         return this.auth.register(body.email, body.password, body.name);
     }
 
     @Post('login')
-    login(@Body() body: { email: string; password: string }) {
+    login(@Body() body: LoginDto) {
         return this.auth.login(body.email, body.password);
     }
 
@@ -31,7 +39,7 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard)
     @Patch('me')
-    updateMe(@Request() req: any, @Body() body: { name?: string }) {
+    updateMe(@Request() req: any, @Body() body: UpdateMeDto) {
         return this.users.updateProfile(req.user.id, { name: body.name });
     }
 
@@ -39,7 +47,7 @@ export class AuthController {
     @Patch('me/password')
     changePassword(
         @Request() req: any,
-        @Body() body: { currentPassword: string; newPassword: string },
+        @Body() body: ChangePasswordDto,
     ) {
         return this.users.changePassword(req.user.id, body.currentPassword, body.newPassword);
     }
@@ -51,12 +59,12 @@ export class AuthController {
     }
 
     @Post('password/forgot')
-    forgotPassword(@Body() body: { email: string }) {
+    forgotPassword(@Body() body: ForgotPasswordDto) {
         return this.auth.requestPasswordReset(body.email);
     }
 
     @Post('password/reset')
-    resetPassword(@Body() body: { token: string; newPassword: string }) {
+    resetPassword(@Body() body: ResetPasswordDto) {
         return this.auth.resetPassword(body.token, body.newPassword);
     }
 

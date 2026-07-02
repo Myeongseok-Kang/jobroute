@@ -1,8 +1,10 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Post, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { AdminGuard } from '../auth/admin.guard';
 import { COLLECT_QUEUE, EMBED_QUEUE, ALERT_QUEUE } from './queue.constants';
 
+@UseGuards(AdminGuard)
 @Controller('queue')
 export class QueueController {
     constructor(

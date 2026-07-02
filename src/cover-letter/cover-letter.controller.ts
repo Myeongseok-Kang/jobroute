@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { CoverLetterService } from './cover-letter.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResumeService } from '../resume/resume.service';
+import { DraftDto, ReviewDto, SearchCoverLetterDto } from './dto/cover-letter.dto';
 
 @Throttle({ default: { ttl: 60000, limit: 20 } })
 @Controller('cover-letter')
@@ -23,7 +24,7 @@ export class CoverLetterController {
     }
 
     @Post('search')
-    search(@Body() body: { query: string; jobCategory?: string }) {
+    search(@Body() body: SearchCoverLetterDto) {
         return this.coverLetter.search(body.query, 3, body.jobCategory);
     }
 
@@ -39,7 +40,7 @@ export class CoverLetterController {
     async draftPersonalized(
         @Request() req: any,
         @Param('jobId') jobId: string,
-        @Body() body: { resumeId?: string },
+        @Body() body: DraftDto,
     ) {
         const resume = body.resumeId
             ? await this.resumeService.findOne(req.user.id, body.resumeId)
@@ -50,7 +51,7 @@ export class CoverLetterController {
 
     // 첨삭
     @Post('review')
-    review(@Body() body: { content: string }) {
+    review(@Body() body: ReviewDto) {
         return this.coverLetter.review(body.content);
     }
 }
