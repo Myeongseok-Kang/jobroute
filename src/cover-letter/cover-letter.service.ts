@@ -253,7 +253,7 @@ export class CoverLetterService {
     }
 
     // 초안
-    async draft(resumeText: string, jobId: string) {
+    async draft(jobId: string, resumeText?: string) {
         const job = await this.prisma.job.findFirst({
             where: { id: jobId, duplicateOf: null, isIT: true },
         });
@@ -268,24 +268,31 @@ export class CoverLetterService {
         ].filter(Boolean).join('\n');
 
         // RAG
-        const samples = await this.search(`${jobText}\n${resumeText}`, 3);
+        const samples = await this.search(resumeText ? `${jobText}\n${resumeText}` : jobText, 3);
         const sampleText = samples
             .map((s, i) => `[참고 합격자소서 ${i + 1}] (${s.company ?? ''} ${s.jobCategory ?? ''})\n${s.content.slice(0, 1500)}`)
             .join('\n\n---\n\n');
 
         const system = `너는 IT 취업 자기소개서 작성을 돕는 어시스턴트야
-지원자의 이력서와 채용공고를 보고, 그 공고에 맞는 자기소개서 초안을 작성하는 게 너의 역할이야
+${resumeText
+                ? '지원자의 이력서와 채용공고를 보고, 그 공고에 맞는 자기소개서 초안을 작성하는 게 너의 역할이야'
+                : '채용공고를 보고, 이력서 없이도 그 공고에 맞춰 바로 다듬어 쓸 수 있는 자기소개서 초안 뼈대를 작성하는 게 너의 역할이야'}
 함께 주어지는 합격자소서 예시들은 이런 식으로 쓰면 합격한다는 참고 자료야. 문체나 구성 흐름을 참고하되, 내용을 베끼지는 마
 
 네가 하는 일
-- 지원자 이력서에 실제로 있는 경험과 기술만으로 자소서를 써. 이력서에 없는 경험을 지어내지 마
-- 공고의 요구사항, 우대사항과 지원자 경험이 겹치는 지점을 찾아서 부각해
+${resumeText
+                ? `- 지원자 이력서에 실제로 있는 경험과 기술만으로 자소서를 써. 이력서에 없는 경험을 지어내지 마
+- 공고의 요구사항, 우대사항과 지원자 경험이 겹치는 지점을 찾아서 부각해`
+                : `- 공고의 요구사항, 우대사항을 읽고, 그 자리에 필요한 역량을 어떤 흐름으로 풀어내면 좋을지 초안 뼈대를 만들어
+- 지원자의 구체적 경험은 알 수 없으니 지어내지 마. 대신 지원자가 자기 경험으로 채워 넣을 자리를 [대괄호]로 표시해 (예: [본인이 진행한 프로젝트], [사용한 기술], [해결한 문제와 성과])`}
 - 합격자소서 예시의 좋은 점(구체적 사례 제시 방식, 문제-해결-성과 구조)을 참고해
 
 작성 규칙
-- 지어내기 절대 금지, 예시를 주자면 이력서에 "Node.js 3년"만 있으면 "5년"이나 "팀 리드 경험" 같은 걸 만들지 마
+${resumeText
+                ? '- 지어내기 절대 금지, 예시를 주자면 이력서에 "Node.js 3년"만 있으면 "5년"이나 "팀 리드 경험" 같은 걸 만들지 마'
+                : '- 지원자의 경험을 지어내지 마. 구체적 사례가 필요한 자리는 [대괄호]로 채워 넣을 항목을 표시해'}
 - 직무역량 항목은 "문제 상황 -> 해결 과정 -> 성과" 구조로 구체적으로
-- 지원동기는 회사/직무와 지원자 경험의 접점을 근거로
+- 지원동기는 회사/직무와 ${resumeText ? '지원자 경험의 접점' : '공고에서 요구하는 역량'}을 근거로
 - 추상적(열정, 최선) 대신 구체적 경험으로
 - 존댓말로, 실제 제출 가능한 수준의 완성도로
 
@@ -306,7 +313,9 @@ export class CoverLetterService {
 가운뎃점(· 또는 ‧)을 쓰지 마. 나열할 땐 쉼표나 "와/과"로 연결해
 AI가 쓴 듯한 정형화된 문투를 피하고 사람이 직접 쓴 것처럼 구체적 경험과 사실 위주로 담백하게 써`;
 
-        const userContent = `[지원자 이력서]\n${resumeText}\n\n[채용공고]\n${jobText}\n\n[참고할 합격자소서 예시]\n${sampleText}`;
+        const userContent = resumeText
+            ? `[지원자 이력서]\n${resumeText}\n\n[채용공고]\n${jobText}\n\n[참고할 합격자소서 예시]\n${sampleText}`
+            : `[채용공고]\n${jobText}\n\n[참고할 합격자소서 예시]\n${sampleText}`;
 
         const res = await this.breaker.fire('openai', () =>
             this.openai.chat.completions.create({
