@@ -27,10 +27,16 @@ export class CoverLetterController {
         return this.coverLetter.search(body.query, 3, body.jobCategory);
     }
 
-    // 초안 생성
-    @UseGuards(JwtAuthGuard)
+    // 초안 생성 (공고만)
     @Post('draft/:jobId')
-    async draft(
+    draft(@Param('jobId') jobId: string) {
+        return this.coverLetter.draft(jobId);
+    }
+
+    // 초안 생성 (공고 + 이력서)
+    @UseGuards(JwtAuthGuard)
+    @Post('draft/:jobId/personalized')
+    async draftPersonalized(
         @Request() req: any,
         @Param('jobId') jobId: string,
         @Body() body: { resumeId?: string },
@@ -39,7 +45,7 @@ export class CoverLetterController {
             ? await this.resumeService.findOne(req.user.id, body.resumeId)
             : await this.resumeService.findLatest(req.user.id);
         if (!resume) return { error: '이력서가 없습니다. 먼저 이력서를 등록해주세요.' };
-        return this.coverLetter.draft(resume.content, jobId);
+        return this.coverLetter.draft(jobId, resume.content);
     }
 
     // 첨삭
