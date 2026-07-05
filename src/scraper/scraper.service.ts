@@ -112,7 +112,8 @@ export class ScraperService {
         }
 
         const json = await res.json();
-        const detail = json.data?.job?.detail;
+        const jobData = json.data?.job;
+        const detail = jobData?.detail;
 
         if (!detail) {
           this.logger.warn(`공고 ${wantedId} detail 없음`);
@@ -131,6 +132,9 @@ export class ScraperService {
           .filter(Boolean)
           .join('\n\n');
 
+        const isActive = jobData.status === 'active';
+        const deadline = jobData.due_time ? new Date(jobData.due_time) : null;
+
         await this.prisma.job.update({
           where: { id: job.id },
           data: {
@@ -140,6 +144,8 @@ export class ScraperService {
             benefits: detail.benefits ?? null,
             rawText: fullText,
             detailFetched: true,
+            isActive,
+            deadline,
           },
         });
 
@@ -166,6 +172,7 @@ export class ScraperService {
   async scrapeSaramin(maxPage = 9999) {
     let saved = 0;
     let skipped = 0;
+    let expired = 0;
     let total = 0;
 
     for (let page = 1; page <= maxPage; page++) {
@@ -194,10 +201,17 @@ export class ScraperService {
         const company = $(el).find('.company_nm .str_tit').first().text().trim();
         const place = $(el).find('.work_place').text().trim();
         const career = $(el).find('.career').text().trim();
+        const dateText = $(el).find('.support_detail .date').text().trim();
         const link = $(el).find('.job_tit .str_tit').attr('href');
         const recIdx = link?.match(/rec_idx=(\d+)/)?.[1];
 
         if (!recIdx || !title) continue;
+
+        const deadline = this.parseDeadline(dateText);
+        if (deadline && deadline.getTime() < Date.now()) {
+          expired++;
+          continue;
+        }
 
         total++;
         const sourceUrl = `https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=${recIdx}`;
@@ -221,17 +235,18 @@ export class ScraperService {
             location: place || null,
             contentHash: hash,
             rawText,
+            deadline,
           },
         });
         saved++;
       }
 
-      this.logger.log(`사람인 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
+      this.logger.log(`사람인 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped}, 마감 ${expired})`);
       await this.sleep(900);
     }
 
-    this.logger.log(`사람인 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
-    return { total, saved, skipped };
+    this.logger.log(`사람인 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}, 마감 ${expired}`);
+    return { total, saved, skipped, expired };
   }
 
   async scrapeSaraminDetails(batchSize = 100) {
@@ -310,6 +325,7 @@ export class ScraperService {
 
     let saved = 0;
     let skipped = 0;
+    let expired = 0;
     let total = 0;
 
     for (let page = 1; page <= maxPage; page++) {
@@ -381,6 +397,14 @@ export class ScraperService {
           }
         });
 
+        const dateText = $(el).find('span.date').text().trim();
+        const deadline = this.parseDeadline(dateText);
+
+        if (deadline && deadline.getTime() < Date.now()) {
+          expired++;
+          continue;
+        }
+
         total++;
         const sourceUrl = `https://www.jobkorea.co.kr/Recruit/GI_Read/${id}`;
         const rawText = title;
@@ -397,6 +421,7 @@ export class ScraperService {
               company: company || exists.company,
               location: location ?? exists.location,
               region: region ?? exists.region,
+              deadline: deadline ?? exists.deadline,
             },
           });
           skipped++;
@@ -413,17 +438,18 @@ export class ScraperService {
             region,
             contentHash: hash,
             rawText,
+            deadline,
           },
         });
         saved++;
       }
 
-      this.logger.log(`잡코리아 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped})`);
+      this.logger.log(`잡코리아 ${page}페이지 완료 (누적 신규 ${saved}, 중복 ${skipped}, 마감 ${expired})`);
       await this.sleep(900);
     }
 
-    this.logger.log(`잡코리아 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}`);
-    return { total, saved, skipped };
+    this.logger.log(`잡코리아 수집 완료 - 전체 ${total}, 신규 ${saved}, 중복 ${skipped}, 마감 ${expired}`);
+    return { total, saved, skipped, expired };
   }
 
   async scrapeJobkoreaDetails(batchSize = 100) {
@@ -502,5 +528,188 @@ export class ScraperService {
 
   private sleep(ms: number) {
     return new Promise((r) => setTimeout(r, ms));
+  }
+
+  private parseDeadline(raw: string): Date | null {
+    if (!raw) return null;
+    const t = raw.replace(/\s+/g, '');
+    if (/상시|수시|채용시|계속|충원시|미정|없음/.test(t)) return null;
+
+    const endOfDay = (d: Date) => {
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
+    if (/오늘마감/.test(t)) return endOfDay(new Date());
+    if (/내일마감/.test(t)) {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return endOfDay(d);
+    }
+    if (/모레마감/.test(t)) {
+      const d = new Date();
+      d.setDate(d.getDate() + 2);
+      return endOfDay(d);
+    }
+
+    const dday = t.match(/D-(\d+)/i);
+    if (dday) {
+      const d = new Date();
+      d.setDate(d.getDate() + Number(dday[1]));
+      return endOfDay(d);
+    }
+
+    const ymd = t.match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);
+    if (ymd) {
+      return endOfDay(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])));
+    }
+
+    const md = t.match(/(\d{1,2})[.\/](\d{1,2})/);
+    if (md) {
+      const now = new Date();
+      const month = Number(md[1]) - 1;
+      const day = Number(md[2]);
+      let d = new Date(now.getFullYear(), month, day);
+      if (d.getTime() < now.getTime() - 30 * 24 * 60 * 60 * 1000) {
+        d = new Date(now.getFullYear() + 1, month, day);
+      }
+      return endOfDay(d);
+    }
+
+    return null;
+  }
+
+  private extractDeadlineFromHtml(html: string): Date | null {
+    const m = html.match(/마감일\s*[:：]?\s*(\d{4})[.\-](\d{1,2})[.\-](\d{1,2})/);
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  private isClosedPage(html: string): boolean {
+    return /마감된 공고|마감된 채용|채용이 마감|삭제된|삭제되었|종료된 채용|존재하지 않는/.test(html);
+  }
+
+  private async revalidateWanted(job: {
+    sourceUrl: string;
+  }): Promise<{ isActive?: boolean; deadline?: Date | null } | null> {
+    const id = job.sourceUrl.split('/').pop();
+    const res = await fetch(
+      `https://www.wanted.co.kr/api/chaos/jobs/v4/${id}/details?${Date.now()}=`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'wanted-user-agent': 'user-web',
+          accept: 'application/json',
+        },
+      },
+    );
+    if (res.status === 404) return { isActive: false };
+    if (!res.ok) return null;
+    const json = await res.json();
+    const jd = json.data?.job;
+    if (!jd) return { isActive: false };
+    return {
+      isActive: jd.status === 'active',
+      deadline: jd.due_time ? new Date(jd.due_time) : null,
+    };
+  }
+
+  private async revalidateSaramin(job: {
+    sourceUrl: string;
+  }): Promise<{ isActive?: boolean; deadline?: Date | null } | null> {
+    const recIdx = job.sourceUrl.match(/rec_idx=(\d+)/)?.[1];
+    if (!recIdx) return null;
+    const res = await fetch(
+      `https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=${recIdx}`,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      },
+    );
+    if (res.status === 404) return { isActive: false };
+    if (!res.ok) return null;
+    const html = await res.text();
+    const deadline = this.extractDeadlineFromHtml(html);
+    if (deadline) return { deadline };
+    if (this.isClosedPage(html)) return { isActive: false };
+    return null;
+  }
+
+  private async revalidateJobkorea(job: {
+    sourceUrl: string;
+  }): Promise<{ isActive?: boolean; deadline?: Date | null } | null> {
+    const id = job.sourceUrl.match(/GI_Read\/(\d+)/)?.[1];
+    if (!id) return null;
+    const res = await fetch(`https://www.jobkorea.co.kr/Recruit/GI_Read/${id}`, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    if (res.status === 404) return { isActive: false };
+    if (!res.ok) return null;
+    const html = await res.text();
+    const deadline = this.extractDeadlineFromHtml(html);
+    if (deadline) return { deadline };
+    if (this.isClosedPage(html)) return { isActive: false };
+    return null;
+  }
+
+  async revalidateActive(pageSize = 200) {
+    let cursor: string | undefined;
+    let checked = 0;
+    let closed = 0;
+    let dated = 0;
+    let active = 0;
+    let unknown = 0;
+
+    while (true) {
+      const batch = await this.prisma.job.findMany({
+        where: { isActive: true, deadline: null },
+        take: pageSize,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        orderBy: { id: 'asc' },
+        select: { id: true, source: true, sourceUrl: true },
+      });
+      if (batch.length === 0) break;
+      cursor = batch[batch.length - 1].id;
+
+      for (const job of batch) {
+        let result: { isActive?: boolean; deadline?: Date | null } | null = null;
+        try {
+          if (job.source === 'wanted') result = await this.revalidateWanted(job);
+          else if (job.source === 'saramin') result = await this.revalidateSaramin(job);
+          else if (job.source === 'jobkorea') result = await this.revalidateJobkorea(job);
+        } catch (err) {
+          this.logger.warn(`재검증 오류 ${job.source} ${job.id}: ${err.message}`);
+        }
+
+        if (result) {
+          await this.prisma.job.update({ where: { id: job.id }, data: result });
+          if (result.isActive === false) closed++;
+          else if (result.deadline) dated++;
+          else active++;
+        } else {
+          unknown++;
+        }
+
+        checked++;
+        if (checked % 50 === 0) {
+          this.logger.log(
+            `재검증 진행 ${checked}건 (마감처리 ${closed}, 마감일보정 ${dated}, 상시확인 ${active}, 미확정 ${unknown})`,
+          );
+        }
+        await this.sleep(900);
+      }
+    }
+
+    this.logger.log(
+      `재검증 완료 - 확인 ${checked}, 마감처리 ${closed}, 마감일보정 ${dated}, 상시확인 ${active}, 미확정 ${unknown}`,
+    );
+    return { checked, closed, dated, active, unknown };
   }
 }

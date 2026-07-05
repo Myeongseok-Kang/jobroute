@@ -63,11 +63,15 @@ export class AlertService {
 
         // 마지막 발송 이후 새로 생성된 공고만 후보
         const since = setting.lastSentAt ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const newCount = await this.prisma.job.count({
             where: {
                 duplicateOf: null,
                 isIT: true,
                 createdAt: { gt: since },
+                isActive: true,
+                OR: [{ deadline: null }, { deadline: { gte: today } }],
             },
         });
 
