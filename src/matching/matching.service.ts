@@ -72,6 +72,8 @@ export class MatchingService {
       WHERE "duplicateOf" IS NULL
         AND embedding IS NOT NULL
         AND "isIT" = true
+        AND "isActive" = true
+        AND ("deadline" IS NULL OR "deadline" >= NOW())
         AND (${region}::text IS NULL OR region = ${region})
         AND (${since}::timestamp IS NULL OR "createdAt" > ${since})
       ORDER BY score DESC

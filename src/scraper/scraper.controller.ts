@@ -53,6 +53,14 @@ export class ScraperController {
     return this.scraperService.scrapeJobkorea();
   }
 
+  @Post('revalidate')
+  revalidate() {
+    this.scraperService
+      .revalidateActive()
+      .catch((err) => console.error('revalidateActive 실패:', err));
+    return { started: true };
+  }
+
   @Post('jobkorea/details')
   async runJobkoreaDetails() {
     let totalProcessed = 0;

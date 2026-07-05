@@ -1,6 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
+function activeWhere() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return {
+    isActive: true,
+    OR: [{ deadline: null }, { deadline: { gte: today } }],
+  };
+}
+
 const CARD_SELECT = {
   id: true,
   source: true,
@@ -35,13 +44,18 @@ export class JobsService {
     const where: any = {
       duplicateOf: null,
       isIT: true,
+      ...activeWhere(),
     };
 
     if (params.q) {
-      where.OR = [
-        { title: { contains: params.q, mode: 'insensitive' } },
-        { company: { contains: params.q, mode: 'insensitive' } },
-        { rawText: { contains: params.q, mode: 'insensitive' } },
+      where.AND = [
+        {
+          OR: [
+            { title: { contains: params.q, mode: 'insensitive' } },
+            { company: { contains: params.q, mode: 'insensitive' } },
+            { rawText: { contains: params.q, mode: 'insensitive' } },
+          ],
+        },
       ];
     }
     if (params.region) where.region = params.region;
@@ -77,7 +91,7 @@ export class JobsService {
 
   async findOne(id: string) {
     const job = await this.prisma.job.findFirst({
-      where: { id, duplicateOf: null, isIT: true },
+      where: { id, duplicateOf: null, isIT: true, ...activeWhere() },
       select: CARD_SELECT,
     });
     if (!job) throw new NotFoundException('공고를 찾을 수 없습니다');
@@ -86,7 +100,7 @@ export class JobsService {
 
   async latest(limit = 10) {
     return this.prisma.job.findMany({
-      where: { duplicateOf: null, isIT: true },
+      where: { duplicateOf: null, isIT: true, ...activeWhere() },
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 50),
       select: CARD_SELECT,
@@ -95,7 +109,7 @@ export class JobsService {
 
   async popular(limit = 10) {
     const jobs = await this.prisma.job.findMany({
-      where: { duplicateOf: null, isIT: true },
+      where: { duplicateOf: null, isIT: true, ...activeWhere() },
       orderBy: { bookmarks: { _count: 'desc' } },
       take: Math.min(limit, 50),
       select: {
